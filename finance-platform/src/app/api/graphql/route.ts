@@ -339,4 +339,3 @@ async function handleGraphQLRequest(request: Request): Promise<Response> {
 
 export const GET = handleGraphQLRequest;
 export const POST = handleGraphQLRequest;
-export const runtime = "nodejs";
