@@ -1,6 +1,6 @@
 import { ApolloServer, HeaderMap } from "@apollo/server";
 import { PrismaPg } from "@prisma/adapter-pg";
-import { PrismaClient } from "@prisma/client";
+import { PrismaClient } from "@prisma/client/extension";
 import { GraphQLError, GraphQLScalarType, Kind } from "graphql";
 import type { HTTPGraphQLRequest } from "@apollo/server";
 
