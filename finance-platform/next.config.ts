@@ -1,11 +1,11 @@
 import type { NextConfig } from "next";
-import { loadenvConfig } from "@next/env";
+import { loadEnvConfig } from "@next/env";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 // The app is nested one directory below the workspace-level .env file.
 const appDirectory = path.dirname(fileURLToPath(import.meta.url));
-loadenvConfig(path.resolve(appDirectory, ".."), undefined, undefined, true);
+loadEnvConfig(path.resolve(appDirectory, ".."), undefined, undefined, true);
 
 const nextConfig: NextConfig = {
   /* config options here */
