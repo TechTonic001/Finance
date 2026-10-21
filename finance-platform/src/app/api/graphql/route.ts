@@ -18,7 +18,7 @@ const prisma =
   globalForPrisma.prisma ??
   new PrismaClient({ adapter: new PrismaPg(databaseUrl) });
 
-if (process.env.NODE_env !== "production") {
+if (process.env.NODE_ENV !== "production") {
   globalForPrisma.prisma = prisma;
 }
 
