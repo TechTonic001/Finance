@@ -217,6 +217,26 @@ const resolvers = {
       };
     },
   },
+  User: {
+    transactions: (parent: { id: string }, _args: unknown, context: GraphQLContext) =>
+      context.prisma.transaction.findMany({ where: { userId: parent.id } }),
+    budgets: (parent: { id: string }, _args: unknown, context: GraphQLContext) =>
+      context.prisma.budget.findMany({ where: { userId: parent.id } }),
+    savingsGoals: (
+      parent: { id: string },
+      _args: unknown,
+      context: GraphQLContext,
+    ) => context.prisma.savingsGoal.findMany({ where: { userId: parent.id } }),
+  },
+  Category: {
+    transactions: (
+      parent: { id: string },
+      _args: unknown,
+      context: GraphQLContext,
+    ) => context.prisma.transaction.findMany({ where: { categoryId: parent.id } }),
+    budgets: (parent: { id: string }, _args: unknown, context: GraphQLContext) =>
+      context.prisma.budget.findMany({ where: { categoryId: parent.id } }),
+  },
   Mutation: {
     addTransaction: (
       _parent: unknown,
