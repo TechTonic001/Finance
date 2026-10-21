@@ -1,28 +1,9 @@
     import { ApolloServer, HeaderMap } from "@apollo/server";
-    import { PrismaPg } from "@prisma/adapter-pg";
-    import { PrismaClient } from "@prisma/client/extension";
     import { GraphQLError, GraphQLScalarType, Kind } from "graphql";
     import type { HTTPGraphQLRequest } from "@apollo/server";
+    import { prisma } from "@/lib/prisma";
 
-    // Prisma 7 uses a driver adapter; reuse the client during Next.js hot reloads.
-    const globalForPrisma = globalThis as typeof globalThis & {
-    prisma?: PrismaClient;
-    };
-
-    const databaseUrl = process.env.DATABASE_URL;
-    if (!databaseUrl) {
-    throw new Error("DATABASE_URL must be set to connect to PostgreSQL.");
-    }
-
-    const prisma =
-    globalForPrisma.prisma ??
-    new PrismaClient({ adapter: new PrismaPg(databaseUrl) });
-
-    if (process.env.NODE_ENV !== "production") {
-    globalForPrisma.prisma = prisma;
-    }
-
-    type GraphQLContext = { prisma: PrismaClient };
+    type GraphQLContext = { prisma: typeof prisma };
 
     const typeDefs = `#graphql
     scalar DateTime
