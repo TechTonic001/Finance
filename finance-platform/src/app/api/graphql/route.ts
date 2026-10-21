@@ -194,14 +194,14 @@ const resolvers = {
       ]);
 
       const totalIncome = transactions.reduce(
-        (total, transaction) =>
+        (total: number, transaction: { amount: number | string; type: string }) =>
           transaction.type.toUpperCase() === "INCOME"
             ? total + Number(transaction.amount)
             : total,
         0,
       );
       const totalExpenses = transactions.reduce(
-        (total, transaction) =>
+        (total: number, transaction: { amount: number | string; type: string }) =>
           transaction.type.toUpperCase() === "EXPENSE"
             ? total + Number(transaction.amount)
             : total,
