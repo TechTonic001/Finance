@@ -324,7 +324,7 @@
         context.prisma.budget.findMany({ where: { categoryId: parent.id } }),
     },
     Mutation: {
-        addTransaction: (
+        addTransaction: async (
         _parent: unknown,
         args: {
             categoryId: string;
@@ -479,6 +479,7 @@
             { errors: [{ message: "The GraphQL request could not be completed." }] },
             { status: 500 },
         );
+    }
     }
 
     export const GET = handleGraphQLRequest;
