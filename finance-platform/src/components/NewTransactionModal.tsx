@@ -61,6 +61,9 @@ export default function NewTransactionModal({
   const [submitTransaction, { loading, error: mutationError }] = useMutation(ADD_TRANSACTION, {
     refetchQueries: [{ query: GET_DASHBOARD_DATA, variables: { userId } }],
     awaitRefetchQueries: true,
+    onError(error) {
+      console.error("Mutation failed:", error);
+    },
     onCompleted() {
       setAmount("");
       setDescription("");
@@ -96,8 +99,12 @@ export default function NewTransactionModal({
 
     try {
       await submitTransaction({ variables });
-    } catch {
-      setFormError("The transaction could not be saved. Please try again.");
+    } catch (error) {
+      setFormError(
+        error instanceof Error
+          ? error.message
+          : "The transaction could not be saved. Please try again.",
+      );
     }
   }
 
