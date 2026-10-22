@@ -1,6 +1,7 @@
 import { ArrowRight, ChartNoAxesCombined, ReceiptText, WalletCards } from "lucide-react";
 import Link from "next/link";
 import PublicNavbar from "@/components/PublicNavbar";
+import Footer from "@/components/Footer";
 
 const features = [
   {
@@ -59,7 +60,7 @@ export default function Home() {
         </div>
       </section>
 
-      <section aria-labelledby="features-heading" className="mx-auto max-w-7xl px-5 pb-20 pt-14 sm:px-8 sm:pb-24 sm:pt-16 lg:px-12">
+      <section aria-labelledby="features-heading" className="mx-auto max-w-7xl px-5 pb-20 pt-14 sm:px-8 sm:pb-24 sm:pt-16 lg:px-12" id="features">
         <div className="mb-9 flex flex-col gap-3 sm:mb-12 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.14em] text-emerald-800">Built for everyday decisions</p>
@@ -85,6 +86,31 @@ export default function Home() {
           ))}
         </div>
       </section>
+
+      <section aria-labelledby="vision-mission-heading" className="bg-[#e8efeb]" id="vision-mission">
+        <div className="mx-auto max-w-7xl px-5 py-14 sm:px-8 sm:py-20 lg:px-12">
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-emerald-800">Why Ledger</p>
+          <h2 className="mt-3 text-3xl font-semibold text-zinc-950 sm:text-4xl" id="vision-mission-heading">
+            Our vision &amp; mission
+          </h2>
+          <div className="mt-9 grid gap-9 border-t border-emerald-900/15 pt-8 md:grid-cols-2 md:gap-14">
+            <div>
+              <h3 className="text-sm font-semibold text-emerald-900">Our vision</h3>
+              <p className="mt-3 max-w-xl text-lg leading-8 text-zinc-700">
+                A world where everyone has complete control and clarity over their financial future.
+              </p>
+            </div>
+            <div>
+              <h3 className="text-sm font-semibold text-emerald-900">Our mission</h3>
+              <p className="mt-3 max-w-xl text-lg leading-8 text-zinc-700">
+                Make practical budgeting tools accessible to everyone, helping people understand their everyday choices and build lasting financial confidence.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <Footer />
     </main>
   );
 }
