@@ -3,7 +3,7 @@
 import { signIn } from "next-auth/react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { FormEvent, useState } from "react";
+import { useState, type FormEvent } from "react";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -16,20 +16,25 @@ export default function LoginPage() {
     setSubmitting(true);
 
     const formData = new FormData(event.currentTarget);
-    const result = await signIn("credentials", {
-      email: formData.get("email"),
-      password: formData.get("password"),
-      redirect: false,
-    });
+    try {
+      const result = await signIn("credentials", {
+        email: formData.get("email"),
+        password: formData.get("password"),
+        redirect: false,
+      });
 
-    setSubmitting(false);
-    if (result?.error) {
-      setError("Those credentials could not be verified.");
-      return;
+      if (result?.error) {
+        setError("Those credentials could not be verified.");
+        return;
+      }
+
+      router.replace("/dashboard");
+      router.refresh();
+    } catch {
+      setError("Could not reach the server. Check your connection and try again.");
+    } finally {
+      setSubmitting(false);
     }
-
-    router.replace("/dashboard");
-    router.refresh();
   }
 
   return (
@@ -97,9 +102,9 @@ export default function LoginPage() {
               {submitting ? "Signing in..." : "Sign in"}
             </button>
           </form>
-          <Link className="mt-7 inline-block text-sm text-zinc-500 hover:text-emerald-800" href="/">
-            Back to home
-          </Link>
+          <p className="mt-7 text-sm text-zinc-500">
+            Don&apos;t have an account? <Link className="font-medium text-emerald-800 hover:text-emerald-950" href="/register">Sign up</Link>
+          </p>
         </div>
       </section>
     </main>
