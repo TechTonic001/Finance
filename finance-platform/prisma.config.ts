@@ -19,4 +19,7 @@ export default defineConfig({
   datasource: {
     url: getDatasourceUrl(),
   },
+  migrations: {
+    seed: "tsx prisma/seed.ts",
+  },
 });
