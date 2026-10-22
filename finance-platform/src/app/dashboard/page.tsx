@@ -4,7 +4,7 @@ import { gql } from "@apollo/client";
 import { useQuery } from "@apollo/client/react";
 import { ArrowDownRight, ArrowUpRight, Plus } from "lucide-react";
 import { useSession } from "next-auth/react";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import {
   CartesianGrid,
   Cell,
@@ -62,7 +62,8 @@ type DashboardData = {
 const chartColors = ["#16715a", "#e49a42", "#4b7b9c", "#b65e57", "#83944b", "#876da8"];
 const currency = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" });
 
-function formatMonth(value: string) {
+function formatMonth(value: ReactNode) {
+  if (typeof value !== "string") return "";
   const [year, month] = value.split("-").map(Number);
   return new Date(year, month - 1, 1).toLocaleDateString("en-US", { month: "short" });
 }

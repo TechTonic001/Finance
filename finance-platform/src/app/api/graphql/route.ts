@@ -1,9 +1,24 @@
     import { ApolloServer, HeaderMap } from "@apollo/server";
     import { GraphQLError, GraphQLScalarType, Kind } from "graphql";
     import type { HTTPGraphQLRequest } from "@apollo/server";
+    import { getServerSession } from "next-auth/next";
+    import { authOptions } from "@/lib/auth";
     import { prisma } from "@/lib/prisma";
 
-    type GraphQLContext = { prisma: typeof prisma };
+    type GraphQLContext = { prisma: typeof prisma; userId?: string };
+
+    function requireOwner(context: GraphQLContext, userId: string) {
+        if (!context.userId) {
+            throw new GraphQLError("Sign in to access financial data.", {
+                extensions: { code: "UNAUTHENTICATED" },
+            });
+        }
+        if (context.userId !== userId) {
+            throw new GraphQLError("You cannot access another user's financial data.", {
+                extensions: { code: "FORBIDDEN" },
+            });
+        }
+    }
 
     const typeDefs = `#graphql
     scalar DateTime
@@ -62,10 +77,35 @@
 
     type UserDashboard {
         totalBalance: Float!
-        totalIncome: Float!
-        totalExpenses: Float!
+        monthlyIncome: Float!
+        monthlyExpenses: Float!
+        monthlyTrend: [MonthlyTrendPoint!]!
+        expensesByCategory: [CategoryExpense!]!
+        recentTransactions: [RecentTransaction!]!
         budgets: [Budget!]!
         savingsGoals: [SavingsGoal!]!
+    }
+
+    type MonthlyTrendPoint {
+        month: String!
+        income: Float!
+        expenses: Float!
+    }
+
+    type CategoryExpense {
+        categoryId: ID!
+        categoryName: String!
+        amount: Float!
+    }
+
+    type RecentTransaction {
+        id: ID!
+        date: DateTime!
+        category: Category!
+        description: String
+        amount: Float!
+        type: String!
+        status: String!
     }
 
     type Query {
@@ -145,7 +185,9 @@
         _parent: unknown,
         args: { userId: string; categoryId?: string | null; month?: string | null },
         context: GraphQLContext,
-        ) =>
+        ) => {
+        requireOwner(context, args.userId);
+        return
         context.prisma.transaction.findMany({
             where: {
             userId: args.userId,
@@ -155,15 +197,30 @@
             include: { category: true },
             orderBy: { date: "desc" },
         }),
+        },
         getUserDashboard: async (
         _parent: unknown,
         args: { userId: string },
         context: GraphQLContext,
         ) => {
-        const [transactions, budgets, savingsGoals] = await Promise.all([
-            context.prisma.transaction.findMany({
+        requireOwner(context, args.userId);
+        const now = new Date();
+        const currentMonthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+        const nextMonthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
+        const sixMonthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 5, 1));
+        const [allTimeTotals, recentPeriodTransactions, budgets, savingsGoals] = await Promise.all([
+            context.prisma.transaction.groupBy({
+            by: ["type"],
             where: { userId: args.userId },
-            select: { amount: true, type: true },
+            _sum: { amount: true },
+            }),
+            context.prisma.transaction.findMany({
+            where: {
+                userId: args.userId,
+                date: { gte: sixMonthStart, lt: nextMonthStart },
+            },
+            include: { category: true },
+            orderBy: { date: "desc" },
             }),
             context.prisma.budget.findMany({
             where: { userId: args.userId },
@@ -174,25 +231,69 @@
             }),
         ]);
 
-            const totalIncome = transactions.reduce<number>(
-                (total, transaction) =>
-            transaction.type.toUpperCase() === "INCOME"
+        const incomeTotal = allTimeTotals.find((entry) => entry.type.toUpperCase() === "INCOME");
+        const expenseTotal = allTimeTotals.find((entry) => entry.type.toUpperCase() === "EXPENSE");
+        const monthlyTransactions = recentPeriodTransactions.filter(
+            (transaction) => transaction.date >= currentMonthStart,
+        );
+        const monthlyIncome = monthlyTransactions.reduce(
+            (total, transaction) => transaction.type.toUpperCase() === "INCOME"
                 ? total + Number(transaction.amount)
                 : total,
             0,
         );
-            const totalExpenses = transactions.reduce<number>(
-                (total, transaction) =>
-            transaction.type.toUpperCase() === "EXPENSE"
+        const monthlyExpenses = monthlyTransactions.reduce(
+            (total, transaction) => transaction.type.toUpperCase() === "EXPENSE"
                 ? total + Number(transaction.amount)
                 : total,
             0,
         );
+        const monthlyTrend = Array.from({ length: 6 }, (_, index) => {
+            const monthDate = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 5 + index, 1));
+            const monthKey = `${monthDate.getUTCFullYear()}-${String(monthDate.getUTCMonth() + 1).padStart(2, "0")}`;
+            const monthTransactions = recentPeriodTransactions.filter((transaction) =>
+                transaction.date.getUTCFullYear() === monthDate.getUTCFullYear()
+                && transaction.date.getUTCMonth() === monthDate.getUTCMonth(),
+            );
+            return {
+                month: monthKey,
+                income: monthTransactions.reduce((sum, transaction) =>
+                    transaction.type.toUpperCase() === "INCOME" ? sum + Number(transaction.amount) : sum, 0),
+                expenses: monthTransactions.reduce((sum, transaction) =>
+                    transaction.type.toUpperCase() === "EXPENSE" ? sum + Number(transaction.amount) : sum, 0),
+            };
+        });
+        const expensesByCategory = monthlyTransactions.reduce<{
+            categoryId: string;
+            categoryName: string;
+            amount: number;
+        }[]>((categories, transaction) => {
+            if (transaction.type.toUpperCase() !== "EXPENSE") return categories;
+            const existing = categories.find((item) => item.categoryId === transaction.categoryId);
+            if (existing) {
+                existing.amount += Number(transaction.amount);
+            } else {
+                categories.push({
+                    categoryId: transaction.categoryId,
+                    categoryName: transaction.category.name,
+                    amount: Number(transaction.amount),
+                });
+            }
+            return categories;
+        }, []).sort((a, b) => b.amount - a.amount);
+        const recentTransactions = recentPeriodTransactions.slice(0, 5).map((transaction) => ({
+            ...transaction,
+            amount: Number(transaction.amount),
+            status: "Completed",
+        }));
 
         return {
-            totalBalance: totalIncome - totalExpenses,
-            totalIncome,
-            totalExpenses,
+            totalBalance: Number(incomeTotal?._sum.amount ?? 0) - Number(expenseTotal?._sum.amount ?? 0),
+            monthlyIncome,
+            monthlyExpenses,
+            monthlyTrend,
+            expensesByCategory,
+            recentTransactions,
             budgets,
             savingsGoals,
         };
@@ -231,6 +332,7 @@
         },
         context: GraphQLContext,
         ) =>
+        requireOwner(context, args.userId),
         context.prisma.transaction.create({
             data: {
             ...args,
@@ -249,7 +351,21 @@
         },
         context: GraphQLContext,
         ) => {
+        if (!context.userId) {
+            throw new GraphQLError("Sign in to update a savings goal.", {
+                extensions: { code: "UNAUTHENTICATED" },
+            });
+        }
         const { id, ...updates } = args;
+        const goal = await context.prisma.savingsGoal.findUnique({
+            where: { id },
+            select: { userId: true },
+        });
+        if (!goal || goal.userId !== context.userId) {
+            throw new GraphQLError("Savings goal not found.", {
+                extensions: { code: "FORBIDDEN" },
+            });
+        }
         return context.prisma.savingsGoal.update({
             where: { id },
             data: Object.fromEntries(
@@ -286,7 +402,10 @@
     };
     const result = await server.executeHTTPGraphQLRequest({
         httpGraphQLRequest,
-        context: async () => ({ prisma }),
+    context: async () => {
+        const session = await getServerSession(authOptions);
+        return { prisma, userId: session?.user?.id };
+    },
     });
 
     const headers = new Headers();
