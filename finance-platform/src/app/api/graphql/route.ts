@@ -187,8 +187,7 @@
         context: GraphQLContext,
         ) => {
         requireOwner(context, args.userId);
-        return
-        context.prisma.transaction.findMany({
+        return context.prisma.transaction.findMany({
             where: {
             userId: args.userId,
             ...(args.categoryId ? { categoryId: args.categoryId } : {}),
@@ -196,7 +195,7 @@
             },
             include: { category: true },
             orderBy: { date: "desc" },
-        }),
+        });
         },
         getUserDashboard: async (
         _parent: unknown,
@@ -331,16 +330,17 @@
             date: Date;
         },
         context: GraphQLContext,
-        ) =>
-        requireOwner(context, args.userId),
-        context.prisma.transaction.create({
+        ) => {
+        requireOwner(context, args.userId);
+        return context.prisma.transaction.create({
             data: {
             ...args,
             description: args.description ?? undefined,
             },
             include: { category: true },
-        }),
-        updateSavingsGoal: (
+        });
+        },
+        updateSavingsGoal: async (
         _parent: unknown,
         args: {
             id: string;
