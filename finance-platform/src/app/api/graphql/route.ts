@@ -335,15 +335,16 @@
         },
         context: GraphQLContext,
         ) => {
-        if (!context.userId) {
-            throw new GraphQLError("Sign in to add a transaction.", {
-                extensions: { code: "UNAUTHENTICATED" },
+        try {
+            if (!context.userId) {
+                throw new GraphQLError("Sign in to add a transaction.", {
+                    extensions: { code: "UNAUTHENTICATED" },
+                });
+            }
+            const category = await context.prisma.category.findFirst({
+                where: { id: args.categoryId, userId: context.userId },
+                select: { id: true },
             });
-        }
-        return context.prisma.category.findFirst({
-            where: { id: args.categoryId, userId: context.userId },
-            select: { id: true },
-        }).then((category) => {
             if (!category) {
                 throw new GraphQLError("Category not found.", {
                     extensions: { code: "BAD_USER_INPUT" },
@@ -352,12 +353,18 @@
             return context.prisma.transaction.create({
                 data: {
                     ...args,
-                    userId: context.userId!,
+                    userId: context.userId,
                     description: args.description ?? undefined,
                 },
                 include: { category: true },
             });
-        });
+        } catch (error) {
+            if (error instanceof GraphQLError) throw error;
+            console.error("GraphQL addTransaction failed.", error);
+            throw new GraphQLError("Unable to save the transaction. Please try again.", {
+                extensions: { code: "INTERNAL_SERVER_ERROR" },
+            });
+        }
         },
         updateSavingsGoal: async (
         _parent: unknown,
@@ -370,27 +377,35 @@
         },
         context: GraphQLContext,
         ) => {
-        if (!context.userId) {
-            throw new GraphQLError("Sign in to update a savings goal.", {
-                extensions: { code: "UNAUTHENTICATED" },
+        try {
+            if (!context.userId) {
+                throw new GraphQLError("Sign in to update a savings goal.", {
+                    extensions: { code: "UNAUTHENTICATED" },
+                });
+            }
+            const { id, ...updates } = args;
+            const goal = await context.prisma.savingsGoal.findUnique({
+                where: { id },
+                select: { userId: true },
+            });
+            if (!goal || goal.userId !== context.userId) {
+                throw new GraphQLError("Savings goal not found.", {
+                    extensions: { code: "FORBIDDEN" },
+                });
+            }
+            return await context.prisma.savingsGoal.update({
+                where: { id },
+                data: Object.fromEntries(
+                    Object.entries(updates).filter(([, value]) => value !== undefined),
+                ),
+            });
+        } catch (error) {
+            if (error instanceof GraphQLError) throw error;
+            console.error("GraphQL updateSavingsGoal failed.", error);
+            throw new GraphQLError("Unable to update the savings goal. Please try again.", {
+                extensions: { code: "INTERNAL_SERVER_ERROR" },
             });
         }
-        const { id, ...updates } = args;
-        const goal = await context.prisma.savingsGoal.findUnique({
-            where: { id },
-            select: { userId: true },
-        });
-        if (!goal || goal.userId !== context.userId) {
-            throw new GraphQLError("Savings goal not found.", {
-                extensions: { code: "FORBIDDEN" },
-            });
-        }
-        return context.prisma.savingsGoal.update({
-            where: { id },
-            data: Object.fromEntries(
-            Object.entries(updates).filter(([, value]) => value !== undefined),
-            ),
-        });
         },
     },
     };
@@ -400,60 +415,70 @@
 
     async function handleGraphQLRequest(request: Request): Promise<Response> {
     // Apollo handles GraphQL parsing/execution; this adapts Web Request to Next's route handler.
-    serverStart ??= server.start();
-    await serverStart;
+    try {
+        serverStart ??= server.start();
+        await serverStart;
 
-    const url = new URL(request.url);
-    let body: unknown;
-    if (request.method !== "GET") {
-        try {
-        body = await request.json();
-        } catch {
-        body = undefined;
+        const url = new URL(request.url);
+        let body: unknown;
+        if (request.method === "POST") {
+            try {
+                body = await request.json();
+            } catch {
+                return Response.json(
+                    { errors: [{ message: "Request body must be valid JSON." }] },
+                    { status: 400 },
+                );
+            }
         }
-    }
 
-    const httpGraphQLRequest: HTTPGraphQLRequest = {
-        method: request.method,
-        headers: new HeaderMap(request.headers.entries()),
-        search: url.search,
-        body,
-    };
-    const result = await server.executeHTTPGraphQLRequest({
-        httpGraphQLRequest,
-    context: async () => {
-        const session = await getServerSession(authOptions);
-        return { prisma, userId: session?.user?.id };
-    },
-    });
-
-    const headers = new Headers();
-    result.headers.forEach((value, key) => headers.set(key, value));
-
-    if (result.body.kind === "complete") {
-        return new Response(result.body.string, {
-        status: result.status ?? 200,
-        headers,
+        const httpGraphQLRequest: HTTPGraphQLRequest = {
+            method: request.method,
+            headers: new HeaderMap(request.headers.entries()),
+            search: url.search,
+            body,
+        };
+        const result = await server.executeHTTPGraphQLRequest({
+            httpGraphQLRequest,
+            context: async () => {
+                const session = await getServerSession(authOptions);
+                return { prisma, userId: session?.user?.id };
+            },
         });
-    }
 
-    const encoder = new TextEncoder();
-    const iterator = result.body.asyncIterator;
-    const stream = new ReadableStream<Uint8Array>({
-        async pull(controller) {
-        const next = await iterator.next();
-        if (next.done) {
-            controller.close();
-        } else {
-            controller.enqueue(encoder.encode(next.value));
+        const headers = new Headers();
+        result.headers.forEach((value, key) => headers.set(key, value));
+
+        if (result.body.kind === "complete") {
+            return new Response(result.body.string, {
+                status: result.status ?? 200,
+                headers,
+            });
         }
-        },
-        async cancel() {
-        await iterator.return?.();
-        },
-    });
 
-    return new Response(stream, { status: result.status ?? 200, headers });
+        const encoder = new TextEncoder();
+        const iterator = result.body.asyncIterator;
+        const stream = new ReadableStream<Uint8Array>({
+            async pull(controller) {
+                const next = await iterator.next();
+                if (next.done) {
+                    controller.close();
+                } else {
+                    controller.enqueue(encoder.encode(next.value));
+                }
+            },
+            async cancel() {
+                await iterator.return?.();
+            },
+        });
+
+        return new Response(stream, { status: result.status ?? 200, headers });
+    } catch (error) {
+        console.error("GraphQL request failed unexpectedly.", error);
+        return Response.json(
+            { errors: [{ message: "The GraphQL request could not be completed." }] },
+            { status: 500 },
+        );
     }
 
     export const GET = handleGraphQLRequest;
