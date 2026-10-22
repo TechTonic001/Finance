@@ -59,8 +59,24 @@ async function main() {
   ];
 
   for (const [index, values] of monthlyValues.entries()) {
+    const transactionMonth = new Date(
+      now.getFullYear(),
+      now.getMonth() - (monthlyValues.length - 1 - index),
+      1,
+    );
+    const lastDay = new Date(
+      transactionMonth.getFullYear(),
+      transactionMonth.getMonth() + 1,
+      0,
+    ).getDate();
+    const latestDay = index === monthlyValues.length - 1 ? now.getDate() : lastDay;
     const dateFor = (day: number) =>
-      new Date(now.getFullYear(), now.getMonth() - (monthlyValues.length - 1 - index), day, 12);
+      new Date(
+        transactionMonth.getFullYear(),
+        transactionMonth.getMonth(),
+        Math.min(day, latestDay),
+        12,
+      );
     const monthDate = dateFor(1);
     const monthKey = `${monthDate.getFullYear()}-${String(monthDate.getMonth() + 1).padStart(2, "0")}`;
 
@@ -115,6 +131,10 @@ async function main() {
       },
     );
   }
+
+  await prisma.transaction.deleteMany({
+    where: { userId: user.id, id: { startsWith: "seed-" } },
+  });
 
   for (const transaction of transactions) {
     const categoryId = categories.get(transaction.category);
