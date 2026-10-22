@@ -1,69 +1,90 @@
-import Image from "next/image";
+import { ArrowRight, ChartNoAxesCombined, ReceiptText, WalletCards } from "lucide-react";
+import Link from "next/link";
+import PublicNavbar from "@/components/PublicNavbar";
+
+const features = [
+  {
+    number: "01",
+    title: "Income and expense tracking",
+    description: "See what comes in and where it goes, with every transaction organized in one place.",
+    icon: ReceiptText,
+  },
+  {
+    number: "02",
+    title: "Monthly budgets",
+    description: "Set practical limits by category and check your pace before the month gets away from you.",
+    icon: WalletCards,
+  },
+  {
+    number: "03",
+    title: "Visual dashboards",
+    description: "Turn everyday activity into clear trends that make your progress easier to understand.",
+    icon: ChartNoAxesCombined,
+  },
+];
 
 export default function Home() {
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert h-5 w-[100px]"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the{" "}
-            <code className="rounded bg-black/[.06] px-1.5 py-0.5 font-mono text-[0.9em] dark:bg-white/[.08]">
-              page.tsx
-            </code>{" "}
-            file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
+    <main className="bg-[#f5f7f4] text-zinc-950">
+      <section
+        className="relative flex min-h-[680px] items-center overflow-hidden bg-[#123f35] bg-cover bg-center md:min-h-[76svh]"
+        style={{
+          backgroundImage:
+            "url('https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?auto=format&fit=crop&w=2200&q=88')",
+        }}
+      >
+        <div aria-hidden="true" className="absolute inset-0 bg-[#092d26]/65" />
+        <PublicNavbar />
+        <div className="relative z-10 mx-auto w-full max-w-7xl px-5 pb-16 pt-32 text-white sm:px-8 sm:pb-20 lg:px-12">
+          <div className="max-w-3xl">
+            <p className="mb-6 text-xs font-semibold uppercase tracking-[0.15em] text-emerald-100 sm:text-sm">
+              A calmer way to manage money
+            </p>
+            <h1 className="max-w-3xl text-5xl font-semibold leading-[1.08] sm:text-6xl lg:text-7xl">
+              Take control of your finances.
+            </h1>
+            <p className="mt-6 max-w-xl text-base leading-7 text-white/80 sm:text-lg sm:leading-8">
+              Bring spending, budgets, and savings goals into one clear view, and make your next money decision with confidence.
+            </p>
+            <div className="mt-9 flex flex-wrap items-center gap-5">
+              <Link className="inline-flex h-12 items-center gap-3 bg-white px-5 text-sm font-semibold text-[#123f35] transition-colors hover:bg-emerald-50" href="/register">
+                Get started
+                <ArrowRight aria-hidden="true" size={17} />
+              </Link>
+              <Link className="text-sm font-medium text-white/90 underline decoration-white/45 underline-offset-4 transition-colors hover:text-white" href="/login">
+                I already have an account
+              </Link>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section aria-labelledby="features-heading" className="mx-auto max-w-7xl px-5 pb-20 pt-14 sm:px-8 sm:pb-24 sm:pt-16 lg:px-12">
+        <div className="mb-9 flex flex-col gap-3 sm:mb-12 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-emerald-800">Built for everyday decisions</p>
+            <h2 className="mt-3 text-3xl font-semibold text-zinc-950" id="features-heading">
+              Your finances, in focus.
+            </h2>
+          </div>
+          <p className="max-w-md text-sm leading-6 text-zinc-600 sm:text-right">
+            The essentials to understand your money today and plan for what comes next.
           </p>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert h-[14px] w-4"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+
+        <div className="grid border-y border-zinc-200 md:grid-cols-3 md:divide-x md:divide-zinc-200">
+          {features.map(({ number, title, description, icon: Icon }) => (
+            <article className="py-7 md:px-7 md:py-8 first:md:pl-0 last:md:pr-0" key={number}>
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold tabular-nums text-emerald-800">{number}</span>
+                <Icon aria-hidden="true" className="text-emerald-800" size={21} strokeWidth={1.7} />
+              </div>
+              <h3 className="mt-6 text-lg font-semibold text-zinc-950">{title}</h3>
+              <p className="mt-2 max-w-sm text-sm leading-6 text-zinc-600">{description}</p>
+            </article>
+          ))}
         </div>
-      </main>
-    </div>
+      </section>
+    </main>
   );
 }
