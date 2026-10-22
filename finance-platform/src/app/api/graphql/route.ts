@@ -174,15 +174,15 @@
             }),
         ]);
 
-        const totalIncome = transactions.reduce(
-            (total: number, transaction: { amount: number | string; type: string }) =>
+            const totalIncome = transactions.reduce<number>(
+                (total, transaction) =>
             transaction.type.toUpperCase() === "INCOME"
                 ? total + Number(transaction.amount)
                 : total,
             0,
         );
-        const totalExpenses = transactions.reduce(
-            (total: number, transaction: { amount: number | string; type: string }) =>
+            const totalExpenses = transactions.reduce<number>(
+                (total, transaction) =>
             transaction.type.toUpperCase() === "EXPENSE"
                 ? total + Number(transaction.amount)
                 : total,
