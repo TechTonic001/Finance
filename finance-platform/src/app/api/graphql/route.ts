@@ -81,6 +81,7 @@
         monthlyExpenses: Float!
         monthlyTrend: [MonthlyTrendPoint!]!
         expensesByCategory: [CategoryExpense!]!
+        categories: [Category!]!
         recentTransactions: [RecentTransaction!]!
         budgets: [Budget!]!
         savingsGoals: [SavingsGoal!]!
@@ -115,8 +116,7 @@
 
     type Mutation {
         addTransaction(
-        userId: ID!
-        categoryId: ID!
+        categoryId: String!
         amount: Float!
         type: String!
         description: String
@@ -207,7 +207,7 @@
         const currentMonthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
         const nextMonthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
         const sixMonthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 5, 1));
-        const [allTimeTotals, recentPeriodTransactions, budgets, savingsGoals] = await Promise.all([
+        const [allTimeTotals, recentPeriodTransactions, budgets, savingsGoals, categories] = await Promise.all([
             context.prisma.transaction.groupBy({
             by: ["type"],
             where: { userId: args.userId },
@@ -227,6 +227,10 @@
             }),
             context.prisma.savingsGoal.findMany({
             where: { userId: args.userId },
+            }),
+            context.prisma.category.findMany({
+            where: { userId: args.userId },
+            orderBy: [{ type: "asc" }, { name: "asc" }],
             }),
         ]);
 
@@ -292,6 +296,7 @@
             monthlyExpenses,
             monthlyTrend,
             expensesByCategory,
+            categories,
             recentTransactions,
             budgets,
             savingsGoals,
@@ -322,7 +327,6 @@
         addTransaction: (
         _parent: unknown,
         args: {
-            userId: string;
             categoryId: string;
             amount: number;
             type: string;
@@ -331,13 +335,28 @@
         },
         context: GraphQLContext,
         ) => {
-        requireOwner(context, args.userId);
-        return context.prisma.transaction.create({
-            data: {
-            ...args,
-            description: args.description ?? undefined,
-            },
-            include: { category: true },
+        if (!context.userId) {
+            throw new GraphQLError("Sign in to add a transaction.", {
+                extensions: { code: "UNAUTHENTICATED" },
+            });
+        }
+        return context.prisma.category.findFirst({
+            where: { id: args.categoryId, userId: context.userId },
+            select: { id: true },
+        }).then((category) => {
+            if (!category) {
+                throw new GraphQLError("Category not found.", {
+                    extensions: { code: "BAD_USER_INPUT" },
+                });
+            }
+            return context.prisma.transaction.create({
+                data: {
+                    ...args,
+                    userId: context.userId!,
+                    description: args.description ?? undefined,
+                },
+                include: { category: true },
+            });
         });
         },
         updateSavingsGoal: async (

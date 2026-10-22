@@ -1,6 +1,5 @@
 "use client";
 
-import { gql } from "@apollo/client";
 import { useQuery } from "@apollo/client/react";
 import { ArrowDownRight, ArrowUpRight, Plus } from "lucide-react";
 import { useSession } from "next-auth/react";
@@ -18,27 +17,7 @@ import {
   YAxis,
 } from "recharts";
 import NewTransactionModal from "@/components/NewTransactionModal";
-
-export const GET_DASHBOARD_DATA = gql`
-  query GET_DASHBOARD_DATA($userId: ID!) {
-    getUserDashboard(userId: $userId) {
-      totalBalance
-      monthlyIncome
-      monthlyExpenses
-      monthlyTrend { month income expenses }
-      expensesByCategory { categoryId categoryName amount }
-      recentTransactions {
-        id
-        date
-        category { name }
-        description
-        amount
-        type
-        status
-      }
-    }
-  }
-`;
+import { GET_DASHBOARD_DATA } from "@/lib/graphql/queries";
 
 type DashboardData = {
   getUserDashboard: {
@@ -47,6 +26,7 @@ type DashboardData = {
     monthlyExpenses: number;
     monthlyTrend: { month: string; income: number; expenses: number }[];
     expensesByCategory: { categoryId: string; categoryName: string; amount: number }[];
+    categories: { id: string; name: string; type: string | null }[];
     recentTransactions: {
       id: string;
       date: string;
@@ -193,7 +173,12 @@ export default function DashboardPage() {
           </table>
         </div>
       </section>
-      <NewTransactionModal onClose={() => setModalOpen(false)} open={modalOpen} />
+      <NewTransactionModal
+        categories={dashboard?.categories ?? []}
+        onClose={() => setModalOpen(false)}
+        open={modalOpen}
+        userId={userId ?? ""}
+      />
     </section>
   );
 }
