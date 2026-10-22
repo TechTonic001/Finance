@@ -4,7 +4,7 @@ import { gql } from "@apollo/client";
 import { useMutation } from "@apollo/client/react";
 import { X } from "lucide-react";
 import { useState, type FormEvent } from "react";
-import { GET_DASHBOARD_DATA } from "@/lib/graphql/queries";
+import { GET_DASHBOARD_DATA } from "../lib/graphql/queries";
 
 export const ADD_TRANSACTION = gql`
   mutation ADD_TRANSACTION(
