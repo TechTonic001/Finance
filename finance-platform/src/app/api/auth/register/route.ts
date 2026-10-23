@@ -39,9 +39,22 @@ export async function POST(request: Request) {
 
   try {
     const passwordHash = await hash(password, 12);
-    const user = await prisma.user.create({
-      data: { email, password: passwordHash },
-      select: { id: true, email: true },
+    const user = await prisma.$transaction(async (transaction) => {
+      const createdUser = await transaction.user.create({
+        data: { email, password: passwordHash },
+        select: { id: true, email: true },
+      });
+      await transaction.category.createMany({
+        data: [
+          { userId: createdUser.id, name: "Salary", type: "INCOME" },
+          { userId: createdUser.id, name: "Freelance", type: "INCOME" },
+          { userId: createdUser.id, name: "Rent", type: "EXPENSE" },
+          { userId: createdUser.id, name: "Groceries", type: "EXPENSE" },
+          { userId: createdUser.id, name: "Transport", type: "EXPENSE" },
+          { userId: createdUser.id, name: "Utilities", type: "EXPENSE" },
+        ],
+      });
+      return createdUser;
     });
 
     return NextResponse.json({ user }, { status: 201 });

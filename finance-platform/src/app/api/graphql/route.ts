@@ -20,6 +20,17 @@
         }
     }
 
+    function mutationError(operation: string, error: unknown): GraphQLError {
+        if (error instanceof GraphQLError) {
+            return error;
+        }
+
+        console.error(`[GraphQL mutation] ${operation} failed:`, error);
+        return new GraphQLError(`Unable to ${operation}. Please try again.`, {
+            extensions: { code: "INTERNAL_SERVER_ERROR" },
+        });
+    }
+
     const typeDefs = `#graphql
     scalar DateTime
 
@@ -115,6 +126,7 @@
     }
 
     type Mutation {
+        addCategory(name: String!, type: String!): Category!
         addTransaction(
         categoryId: String!
         amount: Float!
@@ -122,6 +134,18 @@
         description: String
         date: DateTime!
         ): Transaction!
+        addBudget(
+        categoryId: ID
+        amount: Float!
+        period: String!
+        startDate: DateTime
+        endDate: DateTime
+        ): Budget!
+        addSavingsGoal(
+        name: String!
+        targetAmount: Float!
+        deadline: DateTime
+        ): SavingsGoal!
         updateSavingsGoal(
         id: ID!
         name: String
@@ -323,8 +347,60 @@
         budgets: (parent: { id: string }, _args: unknown, context: GraphQLContext) =>
         context.prisma.budget.findMany({ where: { categoryId: parent.id } }),
     },
+    Transaction: {
+        amount: (parent: { amount: unknown }) => Number(parent.amount),
+    },
+    Budget: {
+        amount: (parent: { amount: unknown }) => Number(parent.amount),
+    },
+    SavingsGoal: {
+        targetAmount: (parent: { targetAmount: unknown }) => Number(parent.targetAmount),
+        currentAmount: (parent: { currentAmount: unknown }) => Number(parent.currentAmount),
+    },
     Mutation: {
-        addTransaction: (
+        addCategory: async (
+        _parent: unknown,
+        args: { name: string; type: string },
+        context: GraphQLContext,
+        ) => {
+        try {
+            const userId = context.userId;
+            if (!userId) {
+                throw new GraphQLError("Sign in to create a category.", {
+                    extensions: { code: "UNAUTHENTICATED" },
+                });
+            }
+            const name = args.name.trim();
+            const type = args.type.toUpperCase();
+            if (!name) {
+                throw new GraphQLError("Category name is required.", {
+                    extensions: { code: "BAD_USER_INPUT" },
+                });
+            }
+            if (!["INCOME", "EXPENSE"].includes(type)) {
+                throw new GraphQLError("Category type must be INCOME or EXPENSE.", {
+                    extensions: { code: "BAD_USER_INPUT" },
+                });
+            }
+
+            return await context.prisma.category.create({
+                data: { userId, name, type },
+            });
+        } catch (error) {
+            if (
+                error &&
+                typeof error === "object" &&
+                "code" in error &&
+                error.code === "P2002"
+            ) {
+                throw new GraphQLError("A category with that name already exists.", {
+                    extensions: { code: "BAD_USER_INPUT" },
+                });
+            }
+            throw mutationError("create category", error);
+        }
+        },
+        addTransaction: async (
         _parent: unknown,
         args: {
             categoryId: string;
@@ -335,29 +411,141 @@
         },
         context: GraphQLContext,
         ) => {
-        if (!context.userId) {
-            throw new GraphQLError("Sign in to add a transaction.", {
-                extensions: { code: "UNAUTHENTICATED" },
+        try {
+            const userId = context.userId;
+            if (!userId) {
+                throw new GraphQLError("Sign in to add a transaction.", {
+                    extensions: { code: "UNAUTHENTICATED" },
+                });
+            }
+
+            if (!Number.isFinite(args.amount) || args.amount <= 0) {
+                throw new GraphQLError("Transaction amount must be greater than zero.", {
+                    extensions: { code: "BAD_USER_INPUT" },
+                });
+            }
+            if (!["INCOME", "EXPENSE"].includes(args.type.toUpperCase())) {
+                throw new GraphQLError("Transaction type must be INCOME or EXPENSE.", {
+                    extensions: { code: "BAD_USER_INPUT" },
+                });
+            }
+
+            const category = await context.prisma.category.findFirst({
+                where: { id: args.categoryId, userId },
+                select: { id: true },
             });
-        }
-        return context.prisma.category.findFirst({
-            where: { id: args.categoryId, userId: context.userId },
-            select: { id: true },
-        }).then((category) => {
             if (!category) {
                 throw new GraphQLError("Category not found.", {
                     extensions: { code: "BAD_USER_INPUT" },
                 });
             }
-            return context.prisma.transaction.create({
+
+            const transaction = await context.prisma.transaction.create({
                 data: {
-                    ...args,
-                    userId: context.userId!,
+                    categoryId: args.categoryId,
+                    amount: args.amount,
+                    type: args.type.toUpperCase(),
                     description: args.description ?? undefined,
+                    date: args.date,
+                    userId,
                 },
                 include: { category: true },
             });
-        });
+            return { ...transaction, amount: Number(transaction.amount) };
+        } catch (error) {
+            throw mutationError("add transaction", error);
+        }
+        },
+        addBudget: async (
+        _parent: unknown,
+        args: {
+            categoryId?: string | null;
+            amount: number;
+            period: string;
+            startDate?: Date | null;
+            endDate?: Date | null;
+        },
+        context: GraphQLContext,
+        ) => {
+        try {
+            const userId = context.userId;
+            if (!userId) {
+                throw new GraphQLError("Sign in to create a budget.", {
+                    extensions: { code: "UNAUTHENTICATED" },
+                });
+            }
+            if (!Number.isFinite(args.amount) || args.amount <= 0) {
+                throw new GraphQLError("Budget amount must be greater than zero.", {
+                    extensions: { code: "BAD_USER_INPUT" },
+                });
+            }
+            if (!["MONTHLY", "YEARLY"].includes(args.period.toUpperCase())) {
+                throw new GraphQLError("Budget period must be MONTHLY or YEARLY.", {
+                    extensions: { code: "BAD_USER_INPUT" },
+                });
+            }
+            if (args.categoryId) {
+                const category = await context.prisma.category.findFirst({
+                    where: { id: args.categoryId, userId },
+                    select: { id: true },
+                });
+                if (!category) {
+                    throw new GraphQLError("Category not found.", {
+                        extensions: { code: "BAD_USER_INPUT" },
+                    });
+                }
+            }
+
+            return await context.prisma.budget.create({
+                data: {
+                    userId,
+                    categoryId: args.categoryId ?? null,
+                    amount: args.amount,
+                    period: args.period.toUpperCase(),
+                    startDate: args.startDate ?? undefined,
+                    endDate: args.endDate ?? undefined,
+                },
+                include: { category: true },
+            });
+        } catch (error) {
+            throw mutationError("create budget", error);
+        }
+        },
+        addSavingsGoal: async (
+        _parent: unknown,
+        args: { name: string; targetAmount: number; deadline?: Date | null },
+        context: GraphQLContext,
+        ) => {
+        try {
+            const userId = context.userId;
+            if (!userId) {
+                throw new GraphQLError("Sign in to create a savings goal.", {
+                    extensions: { code: "UNAUTHENTICATED" },
+                });
+            }
+            const name = args.name.trim();
+            if (!name) {
+                throw new GraphQLError("Savings goal name is required.", {
+                    extensions: { code: "BAD_USER_INPUT" },
+                });
+            }
+            if (!Number.isFinite(args.targetAmount) || args.targetAmount <= 0) {
+                throw new GraphQLError("Savings goal target must be greater than zero.", {
+                    extensions: { code: "BAD_USER_INPUT" },
+                });
+            }
+
+            return await context.prisma.savingsGoal.create({
+                data: {
+                    userId,
+                    name,
+                    targetAmount: args.targetAmount,
+                    ...(args.deadline ? { deadline: args.deadline } : {}),
+                },
+            });
+        } catch (error) {
+            throw mutationError("create savings goal", error);
+        }
         },
         updateSavingsGoal: async (
         _parent: unknown,
@@ -370,27 +558,34 @@
         },
         context: GraphQLContext,
         ) => {
-        if (!context.userId) {
-            throw new GraphQLError("Sign in to update a savings goal.", {
-                extensions: { code: "UNAUTHENTICATED" },
+        try {
+            const userId = context.userId;
+            if (!userId) {
+                throw new GraphQLError("Sign in to update a savings goal.", {
+                    extensions: { code: "UNAUTHENTICATED" },
+                });
+            }
+
+            const { id, ...updates } = args;
+            const goal = await context.prisma.savingsGoal.findUnique({
+                where: { id },
+                select: { userId: true },
             });
-        }
-        const { id, ...updates } = args;
-        const goal = await context.prisma.savingsGoal.findUnique({
-            where: { id },
-            select: { userId: true },
-        });
-        if (!goal || goal.userId !== context.userId) {
-            throw new GraphQLError("Savings goal not found.", {
-                extensions: { code: "FORBIDDEN" },
+            if (!goal || goal.userId !== userId) {
+                throw new GraphQLError("Savings goal not found.", {
+                    extensions: { code: "FORBIDDEN" },
+                });
+            }
+
+            return await context.prisma.savingsGoal.update({
+                where: { id },
+                data: Object.fromEntries(
+                    Object.entries(updates).filter(([, value]) => value !== undefined),
+                ),
             });
+        } catch (error) {
+            throw mutationError("update savings goal", error);
         }
-        return context.prisma.savingsGoal.update({
-            where: { id },
-            data: Object.fromEntries(
-            Object.entries(updates).filter(([, value]) => value !== undefined),
-            ),
-        });
         },
     },
     };
@@ -405,11 +600,15 @@
 
     const url = new URL(request.url);
     let body: unknown;
-    if (request.method !== "GET") {
+    if (request.method === "POST") {
         try {
-        body = await request.json();
-        } catch {
-        body = undefined;
+            body = await request.json();
+        } catch (error) {
+            console.error("[GraphQL request] Unable to parse POST body:", error);
+            return Response.json(
+                { errors: [{ message: "Request body must contain valid JSON." }] },
+                { status: 400 },
+            );
         }
     }
 

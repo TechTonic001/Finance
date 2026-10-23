@@ -4,7 +4,7 @@
     import { useMutation } from "@apollo/client/react";
     import { X } from "lucide-react";
     import { useState, type FormEvent } from "react";
-    import { GET_DASHBOARD_DATA } from "../lib/graphql/queries";
+    import { ADD_CATEGORY } from "../lib/graphql/queries";
 
     export const ADD_TRANSACTION = gql`
     mutation ADD_TRANSACTION(
@@ -54,13 +54,19 @@
     const [type, setType] = useState("EXPENSE");
     const [date, setDate] = useState("");
     const [formError, setFormError] = useState("");
+    const [categoryName, setCategoryName] = useState("");
+    const [showCategoryForm, setShowCategoryForm] = useState(false);
     const visibleCategories = categories.filter(
         (category) => !category.type || category.type.toUpperCase() === type,
     );
 
     const [submitTransaction, { loading, error: mutationError }] = useMutation(ADD_TRANSACTION, {
-        refetchQueries: [{ query: GET_DASHBOARD_DATA, variables: { userId } }],
+        refetchQueries: "active",
         awaitRefetchQueries: true,
+        onError(error) {
+        console.error("Mutation failed:", error);
+        setFormError(error.message);
+        },
         onCompleted() {
         setAmount("");
         setDescription("");
@@ -71,6 +77,36 @@
         onClose();
         },
     });
+    const [createCategory, { loading: creatingCategory, error: categoryError }] = useMutation<
+        { addCategory: CategoryOption },
+        { name: string; type: string }
+    >(ADD_CATEGORY, {
+        refetchQueries: "active",
+        awaitRefetchQueries: true,
+        onError(error) {
+        console.error("Category creation failed:", error);
+        setFormError(error.message);
+        },
+        onCompleted(data) {
+        setCategoryId(data.addCategory.id);
+        setCategoryName("");
+        setShowCategoryForm(false);
+        setFormError("");
+        },
+    });
+
+    async function handleCreateCategory() {
+        setFormError("");
+        if (!categoryName.trim()) {
+        setFormError("Enter a category name.");
+        return;
+        }
+        try {
+        await createCategory({ variables: { name: categoryName.trim(), type } });
+        } catch (error) {
+        setFormError(error instanceof Error ? error.message : "The category could not be saved.");
+        }
+    }
 
     async function handleSubmit(event: FormEvent<HTMLFormElement>) {
         event.preventDefault();
@@ -85,25 +121,34 @@
         return;
         }
 
+        const parsedAmount = Number(amount);
+        if (!Number.isFinite(parsedAmount) || parsedAmount <= 0) {
+        setFormError("Enter an amount greater than zero.");
+        return;
+        }
+
         const variables = {
         categoryId,
-        amount: Number(amount),
+        amount: parsedAmount,
         description: description.trim() || null,
         type,
         date: new Date(`${date}T12:00:00`).toISOString(),
         };
-        console.log("Submitting transaction:", variables);
 
         try {
         await submitTransaction({ variables });
-        } catch {
-        setFormError("The transaction could not be saved. Please try again.");
+        } catch (error) {
+        setFormError(
+            error instanceof Error
+            ? error.message
+            : "The transaction could not be saved. Please try again.",
+        );
         }
     }
 
     if (!open) return null;
 
-    const errorMessage = formError || mutationError?.message;
+    const errorMessage = formError || mutationError?.message || categoryError?.message;
 
     return (
         <div
@@ -204,7 +249,7 @@
                 Category
                 <select
                     className="mt-2 h-11 w-full border border-zinc-300 bg-white px-3 text-sm text-zinc-700 disabled:bg-zinc-50"
-                    disabled={loading || visibleCategories.length === 0}
+                    disabled={loading || creatingCategory}
                     name="categoryId"
                     onChange={(event) => setCategoryId(event.target.value)}
                     required
@@ -216,7 +261,35 @@
                     ))}
                 </select>
                 {visibleCategories.length === 0 && (
-                    <span className="mt-1 block text-xs font-normal text-zinc-500">No matching categories yet.</span>
+                    <span className="mt-1 block text-xs font-normal text-zinc-500">No matching categories yet. Add one to continue.</span>
+                )}
+                {!showCategoryForm ? (
+                    <button
+                    className="mt-2 text-xs font-medium text-emerald-800 underline underline-offset-2"
+                    disabled={loading || creatingCategory}
+                    onClick={() => setShowCategoryForm(true)}
+                    type="button"
+                    >
+                    Add category
+                    </button>
+                ) : (
+                    <div className="mt-2 flex gap-2">
+                    <input
+                        aria-label="New category name"
+                        className="h-9 min-w-0 flex-1 border border-zinc-300 px-2 text-sm"
+                        onChange={(event) => setCategoryName(event.target.value)}
+                        placeholder={type === "INCOME" ? "Income category" : "Expense category"}
+                        value={categoryName}
+                    />
+                    <button
+                        className="h-9 bg-zinc-900 px-3 text-xs font-medium text-white disabled:opacity-50"
+                        disabled={loading || creatingCategory || !categoryName.trim()}
+                        onClick={handleCreateCategory}
+                        type="button"
+                    >
+                        {creatingCategory ? "Saving..." : "Save"}
+                    </button>
+                    </div>
                 )}
                 </label>
                 <label className="block text-sm font-medium text-zinc-700">

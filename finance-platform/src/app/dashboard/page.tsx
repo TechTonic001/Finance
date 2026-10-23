@@ -86,7 +86,7 @@ export default function DashboardPage() {
         </button>
       </div>
 
-      {error && <p className="border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800" role="alert">Dashboard data could not be loaded. Refresh to try again.</p>}
+      {error && <p className="border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800" role="alert">Dashboard data could not be loaded: {error.message}</p>}
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         <MetricCard amount={dashboard?.totalBalance ?? 0} label="Total balance" tone="balance" />
