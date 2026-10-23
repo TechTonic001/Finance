@@ -1,5 +1,15 @@
 import { gql } from "@apollo/client";
 
+export const GET_CATEGORIES = gql`
+  query GET_CATEGORIES($userId: ID!) {
+    getCategories(userId: $userId) {
+      id
+      name
+      type
+    }
+  }
+`;
+
 export const GET_DASHBOARD_DATA = gql`
   query GET_DASHBOARD_DATA($userId: ID!) {
     getUserDashboard(userId: $userId) {
@@ -8,7 +18,6 @@ export const GET_DASHBOARD_DATA = gql`
       monthlyExpenses
       monthlyTrend { month income expenses }
       expensesByCategory { categoryId categoryName amount }
-      categories { id name type }
       budgets {
         id
         amount

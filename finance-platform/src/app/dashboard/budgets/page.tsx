@@ -3,7 +3,8 @@
 import { useMutation, useQuery } from "@apollo/client/react";
 import { useSession } from "next-auth/react";
 import { useState, type FormEvent } from "react";
-import { GET_DASHBOARD_DATA, GET_TRANSACTIONS, ADD_BUDGET } from "@/lib/graphql/queries";
+import { formatCurrency } from "@/lib/formatters";
+import { GET_CATEGORIES, GET_DASHBOARD_DATA, GET_TRANSACTIONS, ADD_BUDGET } from "@/lib/graphql/queries";
 
 type Category = { id: string; name: string; type: string | null };
 type Budget = {
@@ -15,12 +16,10 @@ type Budget = {
   category: { id: string; name: string } | null;
 };
 type Transaction = { date: string; amount: number; type: string; category: { id: string } };
-type DashboardData = {
-  getUserDashboard: { categories: Category[]; budgets: Budget[] };
-};
+type DashboardData = { getUserDashboard: { budgets: Budget[] } };
+type CategoriesData = { getCategories: Category[] };
 type TransactionsData = { getTransactions: Transaction[] };
 
-const currency = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" });
 const fieldClass = "mt-1 block h-11 w-full border border-zinc-300 bg-white px-3 text-sm";
 
 function budgetRange(period: string) {
@@ -46,6 +45,10 @@ export default function BudgetsPage() {
   const [formError, setFormError] = useState("");
   const [notice, setNotice] = useState("");
   const { data, loading, error } = useQuery<DashboardData>(GET_DASHBOARD_DATA, {
+    variables: { userId },
+    skip: status !== "authenticated" || !userId,
+  });
+  const { data: categoriesData } = useQuery<CategoriesData>(GET_CATEGORIES, {
     variables: { userId },
     skip: status !== "authenticated" || !userId,
   });
@@ -124,7 +127,7 @@ export default function BudgetsPage() {
           Category
           <select className={fieldClass} onChange={(event) => setCategoryId(event.target.value)} value={categoryId}>
             <option value="">All expenses</option>
-            {dashboard?.categories
+            {categoriesData?.getCategories
               .filter((category) => !category.type || category.type.toUpperCase() === "EXPENSE")
               .map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}
           </select>
@@ -177,7 +180,7 @@ export default function BudgetsPage() {
                     <p className="mt-1 text-xs text-zinc-500">{budget.period === "YEARLY" ? "Yearly budget" : "Monthly budget"}</p>
                   </div>
                   <span className={`text-sm font-semibold ${overBudget ? "text-rose-700" : "text-zinc-900"}`}>
-                    {transactionsError ? "Spending unavailable" : `${currency.format(spent)} / ${currency.format(Number(budget.amount))}`}
+                    {transactionsError ? "Spending unavailable" : `${formatCurrency(spent)} / ${formatCurrency(Number(budget.amount))}`}
                   </span>
                 </div>
                 {!transactionsError && (
@@ -189,8 +192,8 @@ export default function BudgetsPage() {
                   {transactionsError
                     ? "Try refreshing to view current usage."
                     : overBudget
-                      ? `Over budget by ${currency.format(spent - Number(budget.amount))}`
-                      : `${currency.format(Number(budget.amount) - spent)} remaining`}
+                      ? `Over budget by ${formatCurrency(spent - Number(budget.amount))}`
+                      : `${formatCurrency(Number(budget.amount) - spent)} remaining`}
                 </p>
               </article>
             );

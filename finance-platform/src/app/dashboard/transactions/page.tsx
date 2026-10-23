@@ -5,7 +5,8 @@ import { Plus } from "lucide-react";
 import { useSession } from "next-auth/react";
 import { useState } from "react";
 import NewTransactionModal from "@/components/NewTransactionModal";
-import { GET_DASHBOARD_DATA, GET_TRANSACTIONS } from "@/lib/graphql/queries";
+import { formatCurrency } from "@/lib/formatters";
+import { GET_CATEGORIES, GET_TRANSACTIONS } from "@/lib/graphql/queries";
 
 type Category = { id: string; name: string; type: string | null };
 type Transaction = {
@@ -16,12 +17,9 @@ type Transaction = {
   description: string | null;
   category: { id: string; name: string };
 };
-type DashboardData = {
-  getUserDashboard: { categories: Category[] };
-};
+type CategoriesData = { getCategories: Category[] };
 type TransactionsData = { getTransactions: Transaction[] };
 
-const currency = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" });
 const currentMonth = new Date().toISOString().slice(0, 7);
 
 export default function TransactionsPage() {
@@ -30,7 +28,7 @@ export default function TransactionsPage() {
   const [categoryId, setCategoryId] = useState("");
   const [month, setMonth] = useState(currentMonth);
   const userId = session?.user?.id ?? "";
-  const { data: dashboardData, error: dashboardError } = useQuery<DashboardData>(GET_DASHBOARD_DATA, {
+  const { data: categoriesData, error: categoriesError } = useQuery<CategoriesData>(GET_CATEGORIES, {
     variables: { userId },
     skip: status !== "authenticated" || !userId,
   });
@@ -81,7 +79,7 @@ export default function TransactionsPage() {
             value={categoryId}
           >
             <option value="">All categories</option>
-            {dashboardData?.getUserDashboard.categories.map((category) => (
+            {categoriesData?.getCategories.map((category) => (
               <option key={category.id} value={category.id}>{category.name}</option>
             ))}
           </select>
@@ -93,9 +91,9 @@ export default function TransactionsPage() {
           Transactions could not be loaded: {error.message}
         </p>
       )}
-      {dashboardError && (
+      {categoriesError && (
         <p className="border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800" role="alert">
-          Transaction categories could not be loaded: {dashboardError.message}
+          Transaction categories could not be loaded: {categoriesError.message}
         </p>
       )}
 
@@ -126,7 +124,7 @@ export default function TransactionsPage() {
                   </td>
                   <td className="px-5 py-4">{isIncome ? "Income" : "Expense"}</td>
                   <td className={`whitespace-nowrap px-5 py-4 text-right font-medium tabular-nums ${isIncome ? "text-emerald-800" : "text-zinc-900"}`}>
-                    {isIncome ? "+" : "−"}{currency.format(transaction.amount)}
+                    {isIncome ? "+" : "−"}{formatCurrency(transaction.amount)}
                   </td>
                 </tr>
               );
@@ -146,7 +144,6 @@ export default function TransactionsPage() {
       </div>
 
       <NewTransactionModal
-        categories={dashboardData?.getUserDashboard.categories ?? []}
         onClose={() => setModalOpen(false)}
         open={modalOpen}
         userId={userId}

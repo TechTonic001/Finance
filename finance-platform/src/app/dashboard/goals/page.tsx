@@ -3,6 +3,7 @@
 import { useMutation, useQuery } from "@apollo/client/react";
 import { useSession } from "next-auth/react";
 import { useState, type FormEvent } from "react";
+import { formatCurrency } from "@/lib/formatters";
 import { ADD_SAVINGS_GOAL, GET_DASHBOARD_DATA, UPDATE_SAVINGS_GOAL } from "@/lib/graphql/queries";
 
 type SavingsGoal = {
@@ -14,7 +15,6 @@ type SavingsGoal = {
 };
 type DashboardData = { getUserDashboard: { savingsGoals: SavingsGoal[] } };
 
-const currency = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" });
 const fieldClass = "mt-1 block h-11 w-full border border-zinc-300 bg-white px-3 text-sm";
 
 export default function GoalsPage() {
@@ -93,7 +93,7 @@ export default function GoalsPage() {
         variables: { id: goal.id, currentAmount: Number(goal.currentAmount) + contribution },
       });
       setContributions((values) => ({ ...values, [goal.id]: "" }));
-      setNotice(`Added ${currency.format(contribution)} to ${goal.name}.`);
+      setNotice(`Added ${formatCurrency(contribution)} to ${goal.name}.`);
     } catch (mutationError) {
       setFormError(mutationError instanceof Error ? mutationError.message : "The contribution could not be saved.");
     }
@@ -163,7 +163,7 @@ export default function GoalsPage() {
                   <div className="h-full bg-emerald-700" style={{ width: `${progress}%` }} />
                 </div>
                 <p className="mt-2 text-sm text-zinc-600">
-                  {currency.format(Number(goal.currentAmount))} saved of {currency.format(Number(goal.targetAmount))}
+                  {formatCurrency(Number(goal.currentAmount))} saved of {formatCurrency(Number(goal.targetAmount))}
                 </p>
                 <form className="mt-5 flex gap-2 border-t border-zinc-100 pt-4" onSubmit={(event) => handleContribution(event, goal)}>
                   <label className="sr-only" htmlFor={`contribution-${goal.id}`}>Contribution amount for {goal.name}</label>

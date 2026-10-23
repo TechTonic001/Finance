@@ -17,6 +17,7 @@ import {
   YAxis,
 } from "recharts";
 import NewTransactionModal from "@/components/NewTransactionModal";
+import { formatCurrency } from "@/lib/formatters";
 import { GET_DASHBOARD_DATA } from "@/lib/graphql/queries";
 
 type DashboardData = {
@@ -26,7 +27,6 @@ type DashboardData = {
     monthlyExpenses: number;
     monthlyTrend: { month: string; income: number; expenses: number }[];
     expensesByCategory: { categoryId: string; categoryName: string; amount: number }[];
-    categories: { id: string; name: string; type: string | null }[];
     recentTransactions: {
       id: string;
       date: string;
@@ -40,8 +40,6 @@ type DashboardData = {
 };
 
 const chartColors = ["#16715a", "#e49a42", "#4b7b9c", "#b65e57", "#83944b", "#876da8"];
-const currency = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" });
-
 function formatMonth(value: ReactNode) {
   if (typeof value !== "string") return "";
   const [year, month] = value.split("-").map(Number);
@@ -56,7 +54,7 @@ function MetricCard({ label, amount, tone }: { label: string; amount: number; to
         <h2 className="text-sm font-medium text-zinc-500">{label}</h2>
         {tone !== "balance" && <Icon aria-hidden="true" className={tone === "income" ? "text-emerald-700" : "text-rose-700"} size={18} />}
       </div>
-      <p className="mt-5 text-2xl font-semibold tabular-nums text-zinc-950 sm:text-3xl">{currency.format(amount)}</p>
+      <p className="mt-5 text-2xl font-semibold tabular-nums text-zinc-950 sm:text-3xl">{formatCurrency(amount)}</p>
       <p className="mt-2 text-xs text-zinc-400">{tone === "balance" ? "Current balance" : "This month"}</p>
     </article>
   );
@@ -106,8 +104,8 @@ export default function DashboardPage() {
                 <LineChart data={dashboard?.monthlyTrend ?? []} margin={{ top: 8, right: 8, bottom: 0, left: -16 }}>
                   <CartesianGrid stroke="#e7ebe8" strokeDasharray="3 3" vertical={false} />
                   <XAxis axisLine={false} dataKey="month" tickFormatter={formatMonth} tickLine={false} tick={{ fill: "#71717a", fontSize: 12 }} />
-                  <YAxis axisLine={false} tickLine={false} tick={{ fill: "#71717a", fontSize: 12 }} tickFormatter={(value: number) => `$${value}`} />
-                  <Tooltip formatter={(value) => currency.format(Number(value))} labelFormatter={formatMonth} />
+                  <YAxis axisLine={false} tickLine={false} tick={{ fill: "#71717a", fontSize: 12 }} tickFormatter={(value: number) => formatCurrency(value)} />
+                  <Tooltip formatter={(value) => formatCurrency(Number(value))} labelFormatter={formatMonth} />
                   <Line dataKey="income" dot={false} name="Income" stroke="#16715a" strokeWidth={2.5} type="monotone" />
                   <Line dataKey="expenses" dot={false} name="Expenses" stroke="#e49a42" strokeWidth={2.5} type="monotone" />
                 </LineChart>
@@ -127,12 +125,12 @@ export default function DashboardPage() {
                     <Pie data={dashboard.expensesByCategory} dataKey="amount" innerRadius="62%" outerRadius="88%" paddingAngle={3} stroke="none">
                       {dashboard.expensesByCategory.map((item, index) => <Cell fill={chartColors[index % chartColors.length]} key={item.categoryId} />)}
                     </Pie>
-                    <Tooltip formatter={(value) => currency.format(Number(value))} />
+                    <Tooltip formatter={(value) => formatCurrency(Number(value))} />
                   </PieChart>
                 </ResponsiveContainer>
                 <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
                   <span className="text-xs text-zinc-500">Spent</span>
-                  <span className="mt-1 text-lg font-semibold tabular-nums text-zinc-950">{currency.format(dashboard.monthlyExpenses)}</span>
+                  <span className="mt-1 text-lg font-semibold tabular-nums text-zinc-950">{formatCurrency(dashboard.monthlyExpenses)}</span>
                 </div>
               </>
             ) : <div className="grid h-full place-items-center text-sm text-zinc-400">No expenses this month</div>}
@@ -141,7 +139,7 @@ export default function DashboardPage() {
             {dashboard?.expensesByCategory.map((item, index) => (
               <li className="flex items-center justify-between gap-3 text-sm" key={item.categoryId}>
                 <span className="flex min-w-0 items-center gap-2 text-zinc-600"><i className="size-2 shrink-0 rounded-full" style={{ backgroundColor: chartColors[index % chartColors.length] }} /><span className="truncate">{item.categoryName}</span></span>
-                <span className="shrink-0 font-medium tabular-nums text-zinc-900">{currency.format(item.amount)}</span>
+                <span className="shrink-0 font-medium tabular-nums text-zinc-900">{formatCurrency(item.amount)}</span>
               </li>
             ))}
           </ul>
@@ -163,7 +161,7 @@ export default function DashboardPage() {
                   <td className="whitespace-nowrap px-5 py-4 tabular-nums sm:px-6">{new Date(transaction.date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</td>
                   <td className="whitespace-nowrap px-5 py-4">{transaction.category.name}</td>
                   <td className="max-w-56 truncate px-5 py-4 text-zinc-500">{transaction.description || "—"}</td>
-                  <td className={`whitespace-nowrap px-5 py-4 text-right font-medium tabular-nums ${isIncome ? "text-emerald-800" : "text-zinc-900"}`}>{isIncome ? "+" : "−"}{currency.format(transaction.amount)}</td>
+                  <td className={`whitespace-nowrap px-5 py-4 text-right font-medium tabular-nums ${isIncome ? "text-emerald-800" : "text-zinc-900"}`}>{isIncome ? "+" : "−"}{formatCurrency(transaction.amount)}</td>
                   <td className="whitespace-nowrap px-5 py-4 text-right text-xs text-emerald-800 sm:px-6">{transaction.status}</td>
                 </tr>;
               })}
@@ -174,7 +172,6 @@ export default function DashboardPage() {
         </div>
       </section>
       <NewTransactionModal
-        categories={dashboard?.categories ?? []}
         onClose={() => setModalOpen(false)}
         open={modalOpen}
         userId={userId ?? ""}

@@ -1,10 +1,10 @@
     "use client";
 
     import { gql } from "@apollo/client";
-    import { useMutation } from "@apollo/client/react";
+    import { useMutation, useQuery } from "@apollo/client/react";
     import { X } from "lucide-react";
     import { useState, type FormEvent } from "react";
-    import { ADD_CATEGORY } from "../lib/graphql/queries";
+    import { ADD_CATEGORY, GET_CATEGORIES } from "../lib/graphql/queries";
 
     export const ADD_TRANSACTION = gql`
     mutation ADD_TRANSACTION(
@@ -38,14 +38,12 @@
     type NewTransactionModalProps = {
     open: boolean;
     onClose: () => void;
-    categories: CategoryOption[];
     userId: string;
     };
 
     export default function NewTransactionModal({
     open,
     onClose,
-    categories,
     userId,
     }: NewTransactionModalProps) {
     const [amount, setAmount] = useState("");
@@ -56,6 +54,13 @@
     const [formError, setFormError] = useState("");
     const [categoryName, setCategoryName] = useState("");
     const [showCategoryForm, setShowCategoryForm] = useState(false);
+    const { data: categoryData, loading: categoriesLoading, error: categoriesError } = useQuery<{
+        getCategories: CategoryOption[];
+    }>(GET_CATEGORIES, {
+        variables: { userId },
+        skip: !open || !userId,
+    });
+    const categories = categoryData?.getCategories ?? [];
     const visibleCategories = categories.filter(
         (category) => !category.type || category.type.toUpperCase() === type,
     );
@@ -148,7 +153,7 @@
 
     if (!open) return null;
 
-    const errorMessage = formError || mutationError?.message || categoryError?.message;
+    const errorMessage = formError || mutationError?.message || categoryError?.message || categoriesError?.message;
 
     return (
         <div
@@ -217,7 +222,7 @@
             <label className="block text-sm font-medium text-zinc-700">
                 Amount
                 <span className="mt-2 flex h-11 items-center border border-zinc-300 px-3 focus-within:border-emerald-700">
-                <span aria-hidden="true" className="mr-2 text-zinc-400">$</span>
+                <span aria-hidden="true" className="mr-2 text-zinc-400">₦</span>
                 <input
                     className="w-full bg-transparent text-sm outline-none"
                     min="0.01"
@@ -249,13 +254,15 @@
                 Category
                 <select
                     className="mt-2 h-11 w-full border border-zinc-300 bg-white px-3 text-sm text-zinc-700 disabled:bg-zinc-50"
-                    disabled={loading || creatingCategory}
+                    disabled={loading || creatingCategory || categoriesLoading}
                     name="categoryId"
                     onChange={(event) => setCategoryId(event.target.value)}
                     required
                     value={categoryId}
                 >
-                    <option disabled value="">Select category</option>
+                    <option disabled value="">
+                    {categoriesLoading ? "Loading categories..." : "Select category"}
+                    </option>
                     {visibleCategories.map((category) => (
                     <option key={category.id} value={category.id}>{category.name}</option>
                     ))}
@@ -283,7 +290,7 @@
                     />
                     <button
                         className="h-9 bg-zinc-900 px-3 text-xs font-medium text-white disabled:opacity-50"
-                        disabled={loading || creatingCategory || !categoryName.trim()}
+                        disabled={loading || creatingCategory || categoriesLoading || !categoryName.trim()}
                         onClick={handleCreateCategory}
                         type="button"
                     >
@@ -319,7 +326,7 @@
                 </button>
                 <button
                 className="h-10 bg-emerald-800 px-4 text-sm font-semibold text-white hover:bg-emerald-900 disabled:cursor-wait disabled:opacity-60"
-                disabled={loading || visibleCategories.length === 0}
+                disabled={loading || categoriesLoading || visibleCategories.length === 0}
                 type="submit"
                 >
                 {loading ? "Saving..." : "Save transaction"}

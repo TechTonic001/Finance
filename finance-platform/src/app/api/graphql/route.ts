@@ -3,6 +3,7 @@
     import type { HTTPGraphQLRequest } from "@apollo/server";
     import { getServerSession } from "next-auth/next";
     import { authOptions } from "@/lib/auth";
+    import { ensureDefaultCategories } from "@/lib/default-categories";
     import { prisma } from "@/lib/prisma";
 
     type GraphQLContext = { prisma: typeof prisma; userId?: string };
@@ -121,6 +122,7 @@
     }
 
     type Query {
+        getCategories(userId: ID!): [Category!]!
         getTransactions(userId: ID!, categoryId: ID, month: String): [Transaction!]!
         getUserDashboard(userId: ID!): UserDashboard!
     }
@@ -205,6 +207,18 @@
     const resolvers = {
     DateTime: dateTimeScalar,
     Query: {
+        getCategories: async (
+        _parent: unknown,
+        args: { userId: string },
+        context: GraphQLContext,
+        ) => {
+        requireOwner(context, args.userId);
+        await ensureDefaultCategories(context.prisma, args.userId);
+        return context.prisma.category.findMany({
+            where: { userId: args.userId },
+            orderBy: [{ type: "asc" }, { name: "asc" }],
+        });
+        },
         getTransactions: async (
         _parent: unknown,
         args: { userId: string; categoryId?: string | null; month?: string | null },
@@ -227,6 +241,7 @@
         context: GraphQLContext,
         ) => {
         requireOwner(context, args.userId);
+        await ensureDefaultCategories(context.prisma, args.userId);
         const now = new Date();
         const currentMonthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
         const nextMonthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));

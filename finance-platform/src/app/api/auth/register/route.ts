@@ -1,5 +1,6 @@
 import { hash } from "bcryptjs";
 import { NextResponse } from "next/server";
+import { ensureDefaultCategories } from "@/lib/default-categories";
 import { prisma } from "@/lib/prisma";
 
 const BCRYPT_MAX_BYTES = 72;
@@ -44,16 +45,7 @@ export async function POST(request: Request) {
         data: { email, password: passwordHash },
         select: { id: true, email: true },
       });
-      await transaction.category.createMany({
-        data: [
-          { userId: createdUser.id, name: "Salary", type: "INCOME" },
-          { userId: createdUser.id, name: "Freelance", type: "INCOME" },
-          { userId: createdUser.id, name: "Rent", type: "EXPENSE" },
-          { userId: createdUser.id, name: "Groceries", type: "EXPENSE" },
-          { userId: createdUser.id, name: "Transport", type: "EXPENSE" },
-          { userId: createdUser.id, name: "Utilities", type: "EXPENSE" },
-        ],
-      });
+      await ensureDefaultCategories(transaction, createdUser.id);
       return createdUser;
     });
 

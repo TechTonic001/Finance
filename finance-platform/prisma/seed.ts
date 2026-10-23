@@ -1,6 +1,7 @@
 import { hash } from "bcryptjs";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "../src/generated/prisma/client";
+import { ensureDefaultCategories } from "../src/lib/default-categories";
 import { config as loadEnv } from "dotenv";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -28,22 +29,9 @@ async function main() {
     create: { email: demoEmail, name: "Ledger Demo", password: passwordHash },
   });
 
-  const categoryDefinitions = [
-    { name: "Salary", type: "INCOME" },
-    { name: "Freelance", type: "INCOME" },
-    { name: "Rent", type: "EXPENSE" },
-    { name: "Groceries", type: "EXPENSE" },
-    { name: "Transport", type: "EXPENSE" },
-    { name: "Utilities", type: "EXPENSE" },
-  ];
   const categories = new Map<string, string>();
-
-  for (const definition of categoryDefinitions) {
-    const category = await prisma.category.upsert({
-      where: { userId_name: { userId: user.id, name: definition.name } },
-      update: { type: definition.type },
-      create: { userId: user.id, ...definition },
-    });
+  const defaultCategories = await ensureDefaultCategories(prisma, user.id);
+  for (const category of defaultCategories) {
     categories.set(category.name, category.id);
   }
 
@@ -91,7 +79,7 @@ async function main() {
       },
       {
         id: `seed-${monthKey}-freelance`,
-        category: "Freelance",
+        category: "Freelance & Contracts",
         amount: values.freelance,
         type: "INCOME",
         description: "Design project payment",
@@ -99,7 +87,7 @@ async function main() {
       },
       {
         id: `seed-${monthKey}-rent`,
-        category: "Rent",
+        category: "Rent & Housing",
         amount: 1850,
         type: "EXPENSE",
         description: "Apartment rent",
@@ -107,7 +95,7 @@ async function main() {
       },
       {
         id: `seed-${monthKey}-groceries`,
-        category: "Groceries",
+        category: "Food & Groceries",
         amount: values.groceries,
         type: "EXPENSE",
         description: "Groceries and household supplies",
@@ -115,7 +103,7 @@ async function main() {
       },
       {
         id: `seed-${monthKey}-transport`,
-        category: "Transport",
+        category: "Transport & Fuel",
         amount: values.transport,
         type: "EXPENSE",
         description: "Transit and rideshare",
@@ -123,7 +111,7 @@ async function main() {
       },
       {
         id: `seed-${monthKey}-utilities`,
-        category: "Utilities",
+        category: "Electricity & Utilities",
         amount: values.utilities,
         type: "EXPENSE",
         description: "Utilities and internet",
@@ -162,8 +150,8 @@ async function main() {
     });
   }
 
-  const rentCategoryId = categories.get("Rent");
-  if (!rentCategoryId) throw new Error("Missing Rent category.");
+  const rentCategoryId = categories.get("Rent & Housing");
+  if (!rentCategoryId) throw new Error("Missing Rent & Housing category.");
 
   await prisma.budget.upsert({
     where: { id: "seed-monthly-rent-budget" },
