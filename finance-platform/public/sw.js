@@ -1,4 +1,4 @@
-const CACHE_NAME = "finance-static-v1";
+const CACHE_NAME = "finance-static-v2";
 const STATIC_PREFIXES = ["/_next/static/", "/icons/"];
 
 self.addEventListener("install", (event) => {
@@ -25,12 +25,17 @@ self.addEventListener("fetch", (event) => {
   }
 
   event.respondWith(
-    caches.open(CACHE_NAME).then(async (cache) => {
-      const cachedResponse = await cache.match(request);
-      if (cachedResponse) return cachedResponse;
-      const response = await fetch(request);
-      if (response.ok) await cache.put(request, response.clone());
-      return response;
-    }),
+    fetch(request)
+      .then(async (response) => {
+        if (response.ok) {
+          const cache = await caches.open(CACHE_NAME);
+          await cache.put(request, response.clone());
+        }
+        return response;
+      })
+      .catch(async () => {
+        const cachedResponse = await caches.match(request);
+        return cachedResponse ?? Response.error();
+      }),
   );
 });
