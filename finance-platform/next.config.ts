@@ -9,6 +9,7 @@ loadEnvConfig(path.resolve(appDirectory, ".."), undefined, undefined, true);
 
 const nextConfig: NextConfig = {
   /* config options here */
+  devIndicators: false,
   experimental: {
     agentFeedback: true,
   },
