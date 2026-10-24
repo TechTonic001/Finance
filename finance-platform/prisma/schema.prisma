@@ -12,12 +12,33 @@ model User {
   email        String        @unique
   password     String
   name         String?
+  role         String        @default("USER")
   categories   Category[]
+  accounts     Account[]
   transactions Transaction[]
+  transfers    Transfer[]
+  auditLogs    AuditLog[]
   budgets      Budget[]
   savingsGoals SavingsGoal[]
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
+}
+
+model Account {
+  id                String        @id @default(cuid())
+  name              String
+  type              String        @default("CASH")
+  balance           Decimal       @default(0) @db.Decimal(14, 2)
+  userId            String
+  user              User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  transactions      Transaction[]
+  outgoingTransfers Transfer[]    @relation("TransferFromAccount")
+  incomingTransfers Transfer[]    @relation("TransferToAccount")
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  @@unique([userId, name])
+  @@index([userId])
 }
 
 model Category {
@@ -36,19 +57,56 @@ model Category {
 }
 
 model Transaction {
-  id          String   @id @default(cuid())
-  userId      String
-  categoryId  String
-  amount      Decimal  @db.Decimal(14, 2)
-  type        String
-  description String?
-  date        DateTime @default(now())
-  createdAt   DateTime @default(now())
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  category    Category @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  id                 String    @id @default(cuid())
+  userId             String
+  categoryId         String
+  accountId          String?
+  amount             Decimal   @db.Decimal(14, 2)
+  type               String
+  description        String?
+  date               DateTime  @default(now())
+  recurringFrequency String?
+  nextOccurrence     DateTime?
+  createdAt          DateTime  @default(now())
+  user               User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  category           Category  @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  account            Account?  @relation(fields: [accountId], references: [id], onDelete: SetNull)
 
   @@index([userId, date])
   @@index([categoryId])
+  @@index([accountId])
+  @@index([nextOccurrence])
+}
+
+model Transfer {
+  id            String   @id @default(cuid())
+  userId        String
+  fromAccountId String
+  toAccountId   String
+  amount        Decimal  @db.Decimal(14, 2)
+  date          DateTime @default(now())
+  createdAt     DateTime @default(now())
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  fromAccount   Account  @relation("TransferFromAccount", fields: [fromAccountId], references: [id], onDelete: Restrict)
+  toAccount     Account  @relation("TransferToAccount", fields: [toAccountId], references: [id], onDelete: Restrict)
+
+  @@index([userId, date])
+  @@index([fromAccountId])
+  @@index([toAccountId])
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  userId     String
+  action     String
+  entityType String
+  entityId   String
+  details    Json?
+  createdAt  DateTime @default(now())
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([entityType, entityId])
 }
 
 model Budget {

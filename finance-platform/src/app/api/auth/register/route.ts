@@ -1,5 +1,6 @@
 import { hash } from "bcryptjs";
 import { NextResponse } from "next/server";
+import { ensureDefaultAccounts } from "@/lib/default-accounts";
 import { ensureDefaultCategories } from "@/lib/default-categories";
 import { prisma } from "@/lib/prisma";
 
@@ -46,6 +47,7 @@ export async function POST(request: Request) {
         select: { id: true, email: true },
       });
       await ensureDefaultCategories(transaction, createdUser.id);
+      await ensureDefaultAccounts(transaction, createdUser.id);
       return createdUser;
     });
 

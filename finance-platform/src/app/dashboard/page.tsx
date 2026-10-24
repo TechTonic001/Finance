@@ -1,9 +1,9 @@
 "use client";
 
-import { useQuery } from "@apollo/client/react";
+import { useMutation, useQuery } from "@apollo/client/react";
 import { ArrowDownRight, ArrowUpRight, Plus } from "lucide-react";
 import { useSession } from "next-auth/react";
-import { useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
   CartesianGrid,
   Cell,
@@ -18,7 +18,12 @@ import {
 } from "recharts";
 import NewTransactionModal from "@/components/NewTransactionModal";
 import { formatCurrency } from "@/lib/formatters";
-import { GET_DASHBOARD_DATA } from "@/lib/graphql/queries";
+import {
+  GET_BUDGET_STATUSES,
+  GET_DASHBOARD_DATA,
+  GET_MONTHLY_SPENDING_COMPARISON,
+  PROCESS_DUE_RECURRING_TRANSACTIONS,
+} from "@/lib/graphql/queries";
 
 type DashboardData = {
   getUserDashboard: {
@@ -38,8 +43,26 @@ type DashboardData = {
     }[];
   };
 };
+type BudgetStatus = {
+  budgetId: string;
+  categoryName: string;
+  amount: number;
+  spent: number;
+  percentage: number;
+  threshold: number;
+};
+type BudgetStatusesData = { getBudgetStatuses: BudgetStatus[] };
+type SpendingComparison = {
+  currentMonth: string;
+  previousMonth: string;
+  currentSpending: number;
+  previousSpending: number;
+  percentageChange: number;
+};
+type SpendingComparisonData = { getMonthlySpendingComparison: SpendingComparison };
 
 const chartColors = ["#16715a", "#e49a42", "#4b7b9c", "#b65e57", "#83944b", "#876da8"];
+const currentMonth = new Date().toISOString().slice(0, 7);
 function formatMonth(value: ReactNode) {
   if (typeof value !== "string") return "";
   const [year, month] = value.split("-").map(Number);
@@ -63,13 +86,44 @@ function MetricCard({ label, amount, tone }: { label: string; amount: number; to
 export default function DashboardPage() {
   const { data: session, status } = useSession();
   const [modalOpen, setModalOpen] = useState(false);
-  const userId = session?.user?.id;
-  const { data, loading, error } = useQuery<DashboardData>(GET_DASHBOARD_DATA, {
-    variables: { userId: userId ?? "" },
+  const [recurringError, setRecurringError] = useState("");
+  const processedForUser = useRef<string | null>(null);
+  const userId = session?.user?.id ?? "";
+  const queryOptions = {
+    variables: { userId },
     skip: status !== "authenticated" || !userId,
+  };
+  const { data, loading, error } = useQuery<DashboardData>(GET_DASHBOARD_DATA, {
+    ...queryOptions,
     fetchPolicy: "cache-and-network",
   });
+  const { data: budgetData, error: budgetError } = useQuery<BudgetStatusesData>(GET_BUDGET_STATUSES, {
+    variables: { userId, month: currentMonth },
+    skip: status !== "authenticated" || !userId,
+  });
+  const { data: comparisonData, error: comparisonError } = useQuery<SpendingComparisonData>(
+    GET_MONTHLY_SPENDING_COMPARISON,
+    { variables: { userId, month: currentMonth }, skip: status !== "authenticated" || !userId },
+  );
+  const [processRecurring] = useMutation(PROCESS_DUE_RECURRING_TRANSACTIONS, {
+    refetchQueries: "active",
+    awaitRefetchQueries: true,
+  });
+  useEffect(() => {
+    if (status !== "authenticated" || !userId || processedForUser.current === userId) return;
+    processedForUser.current = userId;
+    processRecurring().catch((processingError: unknown) => {
+      console.error("Recurring transaction processing failed:", processingError);
+      setRecurringError(
+        processingError instanceof Error
+          ? processingError.message
+          : "Recurring transactions could not be processed.",
+      );
+    });
+  }, [processRecurring, status, userId]);
   const dashboard = data?.getUserDashboard;
+  const budgetAlerts = (budgetData?.getBudgetStatuses ?? []).filter((budget) => budget.threshold >= 80);
+  const comparison = comparisonData?.getMonthlySpendingComparison;
 
   return (
     <section className="space-y-7">
@@ -85,6 +139,37 @@ export default function DashboardPage() {
       </div>
 
       {error && <p className="border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800" role="alert">Dashboard data could not be loaded: {error.message}</p>}
+      {recurringError && <p className="border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800" role="alert">Recurring items could not be processed: {recurringError}</p>}
+      {budgetError && <p className="border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800" role="alert">Budget notifications could not be loaded: {budgetError.message}</p>}
+      {budgetAlerts.length > 0 && (
+        <aside aria-label="Budget threshold notifications" className={`border px-5 py-4 ${budgetAlerts.some((budget) => budget.threshold === 100) ? "border-rose-300 bg-rose-50 text-rose-900" : "border-amber-300 bg-amber-50 text-amber-950"}`} role="status">
+          <h2 className="font-semibold">Budget threshold notification</h2>
+          <ul className="mt-2 space-y-1 text-sm">
+            {budgetAlerts.map((budget) => (
+              <li key={budget.budgetId}>
+                <strong>{budget.categoryName}</strong>: {Math.round(budget.percentage)}% used
+                ({formatCurrency(budget.spent)} of {formatCurrency(budget.amount)})
+                {budget.threshold === 100 ? " — budget reached or exceeded." : " — approaching your limit."}
+              </li>
+            ))}
+          </ul>
+        </aside>
+      )}
+      {comparisonError && <p className="border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800" role="alert">Monthly spending comparison could not be loaded: {comparisonError.message}</p>}
+      {comparison && (
+        <section aria-label="Monthly spending comparison" className="flex flex-col gap-2 border border-zinc-200 bg-white p-5 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h2 className="font-semibold text-zinc-950">Monthly spending comparison</h2>
+            <p className="mt-1 text-sm text-zinc-500">{comparison.currentMonth} vs. {comparison.previousMonth}</p>
+          </div>
+          <div className="text-sm text-zinc-700">
+            {formatCurrency(comparison.currentSpending)} this month · {formatCurrency(comparison.previousSpending)} last month ·{" "}
+            <span className={`font-semibold ${comparison.percentageChange > 0 ? "text-rose-700" : "text-emerald-800"}`}>
+              {comparison.percentageChange > 0 ? "+" : ""}{comparison.percentageChange.toFixed(1)}%
+            </span>
+          </div>
+        </section>
+      )}
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         <MetricCard amount={dashboard?.totalBalance ?? 0} label="Total balance" tone="balance" />
@@ -174,7 +259,7 @@ export default function DashboardPage() {
       <NewTransactionModal
         onClose={() => setModalOpen(false)}
         open={modalOpen}
-        userId={userId ?? ""}
+        userId={userId}
       />
     </section>
   );

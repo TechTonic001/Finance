@@ -4,7 +4,7 @@
     import { useMutation, useQuery } from "@apollo/client/react";
     import { X } from "lucide-react";
     import { useState, type FormEvent } from "react";
-    import { ADD_CATEGORY, GET_CATEGORIES } from "../lib/graphql/queries";
+    import { ADD_CATEGORY, GET_ACCOUNTS, GET_CATEGORIES } from "../lib/graphql/queries";
 
     export const ADD_TRANSACTION = gql`
     mutation ADD_TRANSACTION(
@@ -13,6 +13,8 @@
         $description: String
         $type: String!
         $date: DateTime!
+        $accountId: ID
+        $recurringFrequency: String
     ) {
         addTransaction(
         categoryId: $categoryId
@@ -20,6 +22,8 @@
         description: $description
         type: $type
         date: $date
+        accountId: $accountId
+        recurringFrequency: $recurringFrequency
         ) {
         id
         amount
@@ -34,6 +38,7 @@
     `;
 
     type CategoryOption = { id: string; name: string; type: string | null };
+    type AccountOption = { id: string; name: string; type: string; balance: number };
 
     type NewTransactionModalProps = {
     open: boolean;
@@ -54,13 +59,22 @@
     const [formError, setFormError] = useState("");
     const [categoryName, setCategoryName] = useState("");
     const [showCategoryForm, setShowCategoryForm] = useState(false);
+    const [accountId, setAccountId] = useState("");
+    const [recurringFrequency, setRecurringFrequency] = useState("");
     const { data: categoryData, loading: categoriesLoading, error: categoriesError } = useQuery<{
         getCategories: CategoryOption[];
     }>(GET_CATEGORIES, {
         variables: { userId },
         skip: !open || !userId,
     });
+    const { data: accountData, loading: accountsLoading, error: accountsError } = useQuery<{
+        getAccounts: AccountOption[];
+    }>(GET_ACCOUNTS, {
+        variables: { userId },
+        skip: !open || !userId,
+    });
     const categories = categoryData?.getCategories ?? [];
+    const accounts = accountData?.getAccounts ?? [];
     const visibleCategories = categories.filter(
         (category) => !category.type || category.type.toUpperCase() === type,
     );
@@ -78,6 +92,8 @@
         setCategoryId("");
         setType("EXPENSE");
         setDate("");
+        setAccountId("");
+        setRecurringFrequency("");
         setFormError("");
         onClose();
         },
@@ -138,6 +154,8 @@
         description: description.trim() || null,
         type,
         date: new Date(`${date}T12:00:00`).toISOString(),
+        accountId: accountId || null,
+        recurringFrequency: recurringFrequency || null,
         };
 
         try {
@@ -153,7 +171,7 @@
 
     if (!open) return null;
 
-    const errorMessage = formError || mutationError?.message || categoryError?.message || categoriesError?.message;
+    const errorMessage = formError || mutationError?.message || categoryError?.message || categoriesError?.message || accountsError?.message;
 
     return (
         <div
@@ -308,6 +326,36 @@
                     type="date"
                     value={date}
                 />
+                </label>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+                <label className="block text-sm font-medium text-zinc-700">
+                Account <span className="font-normal text-zinc-400">(optional)</span>
+                <select
+                    className="mt-2 h-11 w-full border border-zinc-300 bg-white px-3 text-sm text-zinc-700 disabled:bg-zinc-50"
+                    disabled={loading || accountsLoading}
+                    onChange={(event) => setAccountId(event.target.value)}
+                    value={accountId}
+                >
+                    <option value="">No account</option>
+                    {accounts.map((account) => (
+                    <option key={account.id} value={account.id}>{account.name} ({account.type})</option>
+                    ))}
+                </select>
+                </label>
+                <label className="block text-sm font-medium text-zinc-700">
+                Recurrence <span className="font-normal text-zinc-400">(optional)</span>
+                <select
+                    className="mt-2 h-11 w-full border border-zinc-300 bg-white px-3 text-sm text-zinc-700 disabled:bg-zinc-50"
+                    disabled={loading}
+                    onChange={(event) => setRecurringFrequency(event.target.value)}
+                    value={recurringFrequency}
+                >
+                    <option value="">Does not repeat</option>
+                    <option value="WEEKLY">Weekly</option>
+                    <option value="MONTHLY">Monthly</option>
+                </select>
                 </label>
             </div>
 
