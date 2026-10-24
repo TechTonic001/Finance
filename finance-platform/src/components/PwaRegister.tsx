@@ -20,6 +20,7 @@ export default function PwaRegister() {
     });
 
     function handleBeforeInstallPrompt(event: Event) {
+      if (!("prompt" in event) || typeof event.prompt !== "function") return;
       event.preventDefault();
       setInstallPrompt(event as BeforeInstallPromptEvent);
     }
