@@ -15,16 +15,6 @@
                 extensions: { code: "UNAUTHENTICATED" },
             });
         }
-        if (category.type && category.type.toUpperCase() !== args.type.toUpperCase()) {
-            throw new GraphQLError("Choose a category matching the transaction type.", {
-                extensions: { code: "BAD_USER_INPUT" },
-            });
-        }
-        if (args.description && args.description.length > 500) {
-            throw new GraphQLError("Transaction description cannot exceed 500 characters.", {
-                extensions: { code: "BAD_USER_INPUT" },
-            });
-        }
         if (context.userId !== userId) {
             throw new GraphQLError("You cannot access another user's financial data.", {
                 extensions: { code: "FORBIDDEN" },
