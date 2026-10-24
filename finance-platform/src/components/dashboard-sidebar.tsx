@@ -13,6 +13,7 @@ import { signOut } from "next-auth/react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
+import PwaRegister from "@/components/PwaRegister";
 
 const navigation = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -90,6 +91,7 @@ export function DashboardSidebar() {
         </nav>
 
         <div className="mt-auto border-t border-zinc-100 pt-4">
+          <PwaRegister />
           <button
             className="flex h-11 w-full items-center gap-3 px-3 text-sm text-zinc-600 hover:bg-zinc-50 hover:text-zinc-950"
             onClick={() => signOut({ callbackUrl: "/login" })}

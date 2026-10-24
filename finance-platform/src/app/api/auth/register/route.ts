@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { ensureDefaultAccounts } from "@/lib/default-accounts";
 import { ensureDefaultCategories } from "@/lib/default-categories";
 import { prisma } from "@/lib/prisma";
+import { isValidEmail, isValidPassword } from "@/lib/auth-validation";
 
 const BCRYPT_MAX_BYTES = 72;
 
@@ -21,11 +22,14 @@ export async function POST(request: Request) {
   const { email: rawEmail, password } = body as Record<string, unknown>;
   const email = typeof rawEmail === "string" ? rawEmail.trim().toLowerCase() : "";
 
-  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+  if (!isValidEmail(email)) {
     return NextResponse.json({ error: "Enter a valid email address." }, { status: 400 });
   }
-  if (typeof password !== "string" || password.length < 8) {
-    return NextResponse.json({ error: "Password must be at least 8 characters." }, { status: 400 });
+  if (typeof password !== "string" || !isValidPassword(password)) {
+    return NextResponse.json(
+      { error: "Password must be at least 8 characters and include uppercase, lowercase, a number, and a special character (!@#$%^&*)." },
+      { status: 400 },
+    );
   }
   if (Buffer.byteLength(password, "utf8") > BCRYPT_MAX_BYTES) {
     return NextResponse.json({ error: "Password must be 72 bytes or fewer." }, { status: 400 });

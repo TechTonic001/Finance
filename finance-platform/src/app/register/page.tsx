@@ -3,27 +3,59 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
+import { Eye, EyeOff } from "lucide-react";
+import {
+  isValidEmail,
+  isValidPassword,
+  PASSWORD_REQUIREMENTS,
+} from "@/lib/auth-validation";
 
 export default function RegisterPage() {
   const router = useRouter();
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const requirements = PASSWORD_REQUIREMENTS.map((requirement) => ({
+    ...requirement,
+    met: requirement.test(password),
+  }));
+  const requirementCount = requirements.filter((requirement) => requirement.met).length;
+  const strength = requirementCount === PASSWORD_REQUIREMENTS.length
+    ? { label: "Strong", width: "w-full", color: "bg-emerald-600", text: "text-emerald-800" }
+    : requirementCount >= 3
+      ? { label: "Medium", width: "w-2/3", color: "bg-amber-500", text: "text-amber-700" }
+      : { label: password ? "Weak" : "Not set", width: password ? "w-1/3" : "w-0", color: "bg-rose-500", text: "text-rose-700" };
+  const passwordMatches = password === confirmPassword;
+  const passwordBytesValid = new TextEncoder().encode(password).length <= 72;
+  const canSubmit = isValidEmail(email.trim())
+    && isValidPassword(password)
+    && passwordMatches
+    && passwordBytesValid
+    && !submitting;
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError("");
 
-    const formData = new FormData(event.currentTarget);
-    const email = String(formData.get("email") ?? "").trim();
-    const password = String(formData.get("password") ?? "");
-    const confirmPassword = String(formData.get("confirmPassword") ?? "");
-
-    if (password !== confirmPassword) {
-      setError("Passwords do not match.");
+    const normalizedEmail = email.trim().toLowerCase();
+    if (!isValidEmail(normalizedEmail)) {
+      setError("Enter a valid email address.");
       return;
     }
-    if (password.length < 8) {
-      setError("Password must be at least 8 characters.");
+    if (!isValidPassword(password)) {
+      setError("Meet all password requirements before continuing.");
+      return;
+    }
+    if (!passwordBytesValid) {
+      setError("Password must be 72 bytes or fewer.");
+      return;
+    }
+    if (!passwordMatches) {
+      setError("Passwords do not match.");
       return;
     }
 
@@ -32,7 +64,7 @@ export default function RegisterPage() {
       const response = await fetch("/api/auth/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email: normalizedEmail, password }),
       });
       const result = (await response.json()) as { error?: string };
 
@@ -73,19 +105,85 @@ export default function RegisterPage() {
           <form className="mt-8 space-y-5" onSubmit={handleSubmit}>
             <label className="block text-sm font-medium text-zinc-700">
               Email
-              <input autoComplete="email" className="mt-2 h-11 w-full border border-zinc-300 bg-white px-3 text-sm text-zinc-900 outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/15" name="email" required type="email" />
+              <input
+                autoComplete="email"
+                className="mt-2 h-11 w-full border border-zinc-300 bg-white px-3 text-sm text-zinc-900 outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/15"
+                maxLength={254}
+                name="email"
+                onChange={(event) => setEmail(event.target.value)}
+                required
+                type="email"
+                value={email}
+              />
+              {email && !isValidEmail(email.trim()) && (
+                <span className="mt-1 block text-xs font-normal text-rose-700">Enter a valid email address.</span>
+              )}
             </label>
-            <label className="block text-sm font-medium text-zinc-700">
-              Password
-              <input autoComplete="new-password" className="mt-2 h-11 w-full border border-zinc-300 bg-white px-3 text-sm text-zinc-900 outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/15" minLength={8} name="password" required type="password" />
-              <span className="mt-1 block text-xs font-normal text-zinc-500">Use at least 8 characters.</span>
-            </label>
-            <label className="block text-sm font-medium text-zinc-700">
-              Confirm password
-              <input autoComplete="new-password" className="mt-2 h-11 w-full border border-zinc-300 bg-white px-3 text-sm text-zinc-900 outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/15" minLength={8} name="confirmPassword" required type="password" />
-            </label>
+            <div>
+              <label className="block text-sm font-medium text-zinc-700" htmlFor="password">Password</label>
+              <div className="mt-2 flex h-11 border border-zinc-300 bg-white focus-within:border-emerald-700 focus-within:ring-2 focus-within:ring-emerald-700/15">
+                <input
+                  autoComplete="new-password"
+                  className="min-w-0 flex-1 px-3 text-sm text-zinc-900 outline-none"
+                  id="password"
+                  name="password"
+                  onChange={(event) => setPassword(event.target.value)}
+                  required
+                  type={showPassword ? "text" : "password"}
+                  value={password}
+                />
+                <button
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                  className="grid w-11 shrink-0 place-items-center text-zinc-500 hover:text-zinc-900"
+                  onClick={() => setShowPassword((visible) => !visible)}
+                  type="button"
+                >
+                  {showPassword ? <EyeOff aria-hidden="true" size={18} /> : <Eye aria-hidden="true" size={18} />}
+                </button>
+              </div>
+              <div aria-label={`Password strength: ${strength.label}`} className="mt-3 h-1.5 overflow-hidden bg-zinc-200" role="meter" aria-valuemax={5} aria-valuemin={0} aria-valuenow={requirementCount}>
+                <div className={`h-full transition-all ${strength.width} ${strength.color}`} />
+              </div>
+              <p className={`mt-1 text-xs font-medium ${strength.text}`}>Password strength: {strength.label}</p>
+              <ul className="mt-2 grid gap-1 sm:grid-cols-2">
+                {requirements.map((requirement) => (
+                  <li className={`text-xs ${requirement.met ? "text-emerald-800" : "text-zinc-500"}`} key={requirement.id}>
+                    <span aria-hidden="true">{requirement.met ? "✓" : "○"}</span> {requirement.label}
+                  </li>
+                ))}
+              </ul>
+              {!passwordBytesValid && (
+                <p className="mt-1 text-xs text-rose-700">Password must be 72 bytes or fewer.</p>
+              )}
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-zinc-700" htmlFor="confirmPassword">Confirm password</label>
+              <div className="mt-2 flex h-11 border border-zinc-300 bg-white focus-within:border-emerald-700 focus-within:ring-2 focus-within:ring-emerald-700/15">
+                <input
+                  autoComplete="new-password"
+                  className="min-w-0 flex-1 px-3 text-sm text-zinc-900 outline-none"
+                  id="confirmPassword"
+                  name="confirmPassword"
+                  onChange={(event) => setConfirmPassword(event.target.value)}
+                  required
+                  type={showConfirmPassword ? "text" : "password"}
+                  value={confirmPassword}
+                />
+                <button
+                  aria-label={showConfirmPassword ? "Hide confirm password" : "Show confirm password"}
+                  className="grid w-11 shrink-0 place-items-center text-zinc-500 hover:text-zinc-900"
+                  onClick={() => setShowConfirmPassword((visible) => !visible)}
+                  type="button"
+                >
+                  {showConfirmPassword ? <EyeOff aria-hidden="true" size={18} /> : <Eye aria-hidden="true" size={18} />}
+                </button>
+              </div>
+              {confirmPassword && !passwordMatches && (
+                <span className="mt-1 block text-xs font-normal text-rose-700">Passwords do not match.</span>
+              )}
+            </div>
             {error && <p aria-live="polite" className="text-sm text-red-700" role="alert">{error}</p>}
-            <button className="h-11 w-full bg-emerald-800 px-4 text-sm font-semibold text-white transition-colors hover:bg-emerald-900 disabled:cursor-wait disabled:opacity-60" disabled={submitting} type="submit">
+            <button className="h-11 w-full bg-emerald-800 px-4 text-sm font-semibold text-white transition-colors hover:bg-emerald-900 disabled:cursor-not-allowed disabled:opacity-50" disabled={!canSubmit} type="submit">
               {submitting ? "Creating account..." : "Create account"}
             </button>
           </form>

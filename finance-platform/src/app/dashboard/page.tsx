@@ -17,11 +17,13 @@ import {
   YAxis,
 } from "recharts";
 import NewTransactionModal from "@/components/NewTransactionModal";
+import SafeToSpendCard from "@/components/SafeToSpendCard";
 import { formatCurrency } from "@/lib/formatters";
 import {
   GET_BUDGET_STATUSES,
   GET_DASHBOARD_DATA,
   GET_MONTHLY_SPENDING_COMPARISON,
+  GET_UPCOMING_RECURRING_BILLS,
   PROCESS_DUE_RECURRING_TRANSACTIONS,
 } from "@/lib/graphql/queries";
 
@@ -100,13 +102,19 @@ export default function DashboardPage() {
     ...queryOptions,
     fetchPolicy: "cache-and-network",
   });
-  const { data: budgetData, error: budgetError } = useQuery<BudgetStatusesData>(GET_BUDGET_STATUSES, {
+  const { data: budgetData, loading: budgetLoading, error: budgetError } = useQuery<BudgetStatusesData>(GET_BUDGET_STATUSES, {
     variables: { userId, month: currentMonth },
-    skip: status !== "authenticated" || !userId,
+    skip: status !== "authenticated" || !userId || !currentMonth,
   });
   const { data: comparisonData, error: comparisonError } = useQuery<SpendingComparisonData>(
     GET_MONTHLY_SPENDING_COMPARISON,
-    { variables: { userId, month: currentMonth }, skip: status !== "authenticated" || !userId },
+    { variables: { userId, month: currentMonth }, skip: status !== "authenticated" || !userId || !currentMonth },
+  );
+  const { data: recurringBillsData, loading: recurringBillsLoading, error: recurringBillsError } = useQuery<{
+    getUpcomingRecurringBills: number;
+  }>(
+    GET_UPCOMING_RECURRING_BILLS,
+    { variables: { userId, month: currentMonth }, skip: status !== "authenticated" || !userId || !currentMonth },
   );
   const [processRecurring] = useMutation(PROCESS_DUE_RECURRING_TRANSACTIONS, {
     refetchQueries: "active",
@@ -125,7 +133,9 @@ export default function DashboardPage() {
     });
   }, [processRecurring, status, userId]);
   const dashboard = data?.getUserDashboard;
-  const budgetAlerts = (budgetData?.getBudgetStatuses ?? []).filter((budget) => budget.threshold >= 80);
+  const budgetStatuses = budgetData?.getBudgetStatuses ?? [];
+  const budgetAlerts = budgetStatuses.filter((budget) => budget.threshold >= 80);
+  const monthlyAllocations = budgetStatuses.reduce((total, budget) => total + budget.amount, 0);
   const comparison = comparisonData?.getMonthlySpendingComparison;
 
   return (
@@ -144,6 +154,7 @@ export default function DashboardPage() {
       {error && <p className="border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800" role="alert">Dashboard data could not be loaded: {error.message}</p>}
       {recurringError && <p className="border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800" role="alert">Recurring items could not be processed: {recurringError}</p>}
       {budgetError && <p className="border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800" role="alert">Budget notifications could not be loaded: {budgetError.message}</p>}
+      {recurringBillsError && <p className="border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800" role="alert">Recurring bills could not be loaded: {recurringBillsError.message}</p>}
       {budgetAlerts.length > 0 && (
         <aside aria-label="Budget threshold notifications" className={`border px-5 py-4 ${budgetAlerts.some((budget) => budget.threshold === 100) ? "border-rose-300 bg-rose-50 text-rose-900" : "border-amber-300 bg-amber-50 text-amber-950"}`} role="status">
           <h2 className="font-semibold">Budget threshold notification</h2>
@@ -179,6 +190,14 @@ export default function DashboardPage() {
         <MetricCard amount={dashboard?.monthlyIncome ?? 0} label="Income" tone="income" />
         <MetricCard amount={dashboard?.monthlyExpenses ?? 0} label="Expenses" tone="expense" />
       </div>
+
+      <SafeToSpendCard
+        loading={!dashboard || budgetLoading || recurringBillsLoading}
+        monthlyAllocations={monthlyAllocations}
+        monthlyExpenses={dashboard?.monthlyExpenses ?? 0}
+        monthlyIncome={dashboard?.monthlyIncome ?? 0}
+        recurringBills={recurringBillsData?.getUpcomingRecurringBills ?? 0}
+      />
 
       <div className="grid gap-5 xl:grid-cols-[1.65fr_1fr]">
         <section className="border border-zinc-200 bg-white p-5 sm:p-6">

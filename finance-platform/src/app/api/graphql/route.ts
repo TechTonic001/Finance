@@ -173,6 +173,7 @@
         getUserDashboard(userId: ID!): UserDashboard!
         getMonthlySpendingComparison(userId: ID!, month: String): MonthlySpendingComparison!
         getBudgetStatuses(userId: ID!, month: String!): [BudgetStatus!]!
+        getUpcomingRecurringBills(userId: ID!, month: String!): Float!
         getTransfers(userId: ID!): [Transfer!]!
     }
 
@@ -456,6 +457,50 @@
                 threshold: percentage >= 100 ? 100 : percentage >= 80 ? 80 : 0,
             };
         });
+        },
+        getUpcomingRecurringBills: async (
+        _parent: unknown,
+        args: { userId: string; month: string },
+        context: GraphQLContext,
+        ) => {
+        requireOwner(context, args.userId);
+        const range = monthDateRange(args.month);
+        const recurringExpenses = await context.prisma.transaction.findMany({
+            where: {
+                userId: args.userId,
+                type: "EXPENSE",
+                recurringFrequency: { not: null },
+                nextOccurrence: { lt: range.lt },
+            },
+            select: { amount: true, recurringFrequency: true, nextOccurrence: true },
+        });
+        let total = 0;
+        for (const recurring of recurringExpenses) {
+            let occurrence = recurring.nextOccurrence;
+            const frequency = recurring.recurringFrequency;
+            if (!occurrence || !frequency) continue;
+            let occurrencesChecked = 0;
+            while (occurrence < range.gte) {
+                if (occurrencesChecked >= 1200) {
+                    throw new GraphQLError("A recurring schedule could not be calculated for this month.", {
+                        extensions: { code: "INTERNAL_SERVER_ERROR" },
+                    });
+                }
+                occurrence = nextRecurringDate(occurrence, frequency);
+                occurrencesChecked += 1;
+            }
+            while (occurrence < range.lt) {
+                if (occurrencesChecked >= 1200) {
+                    throw new GraphQLError("A recurring schedule could not be calculated for this month.", {
+                        extensions: { code: "INTERNAL_SERVER_ERROR" },
+                    });
+                }
+                total += Number(recurring.amount);
+                occurrence = nextRecurringDate(occurrence, frequency);
+                occurrencesChecked += 1;
+            }
+        }
+        return total;
         },
         getTransfers: async (
         _parent: unknown,

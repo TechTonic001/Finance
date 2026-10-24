@@ -102,6 +102,12 @@ export const GET_BUDGET_STATUSES = gql`
   }
 `;
 
+export const GET_UPCOMING_RECURRING_BILLS = gql`
+  query GET_UPCOMING_RECURRING_BILLS($userId: ID!, $month: String!) {
+    getUpcomingRecurringBills(userId: $userId, month: $month)
+  }
+`;
+
 export const GET_MONTHLY_SPENDING_COMPARISON = gql`
   query GET_MONTHLY_SPENDING_COMPARISON($userId: ID!, $month: String) {
     getMonthlySpendingComparison(userId: $userId, month: $month) {
