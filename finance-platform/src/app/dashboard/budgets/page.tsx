@@ -2,7 +2,7 @@
 
 import { useMutation, useQuery } from "@apollo/client/react";
 import { useSession } from "next-auth/react";
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { formatCurrency } from "@/lib/formatters";
 import { ADD_BUDGET, GET_BUDGET_STATUSES, GET_CATEGORIES } from "@/lib/graphql/queries";
 
@@ -19,7 +19,6 @@ type BudgetStatus = {
 type CategoriesData = { getCategories: Category[] };
 type BudgetStatusesData = { getBudgetStatuses: BudgetStatus[] };
 
-const currentMonth = new Date().toISOString().slice(0, 7);
 const fieldClass = "mt-1 block h-11 w-full border border-zinc-300 bg-white px-3 text-sm";
 
 function budgetRange(month: string) {
@@ -38,10 +37,13 @@ export default function BudgetsPage() {
   const userId = session?.user?.id ?? "";
   const [amount, setAmount] = useState("");
   const [categoryId, setCategoryId] = useState("");
-  const [month, setMonth] = useState(currentMonth);
+  const [month, setMonth] = useState("");
   const [formError, setFormError] = useState("");
   const [notice, setNotice] = useState("");
-  const queryOptions = { skip: status !== "authenticated" || !userId };
+  useEffect(() => {
+    setMonth(new Date().toISOString().slice(0, 7));
+  }, []);
+  const queryOptions = { skip: status !== "authenticated" || !userId || !month };
   const { data: categoriesData, loading: categoriesLoading, error: categoriesError } = useQuery<CategoriesData>(
     GET_CATEGORIES,
     { variables: { userId }, ...queryOptions },

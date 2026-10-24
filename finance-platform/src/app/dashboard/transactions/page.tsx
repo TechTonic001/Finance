@@ -34,7 +34,6 @@ type CategoriesData = { getCategories: Category[] };
 type AccountsData = { getAccounts: Account[] };
 type TransactionsData = { getTransactions: Transaction[] };
 
-const currentMonth = new Date().toISOString().slice(0, 7);
 const fieldClass = "h-10 w-full border border-zinc-300 bg-white px-3 text-sm";
 const currencyClass = "whitespace-nowrap px-4 py-3 text-right font-medium tabular-nums";
 
@@ -73,8 +72,13 @@ export default function TransactionsPage() {
   const [categoryId, setCategoryId] = useState("");
   const [type, setType] = useState("");
   const [dateFilter, setDateFilter] = useState("month");
-  const [month, setMonth] = useState(currentMonth);
-  const [year, setYear] = useState(String(new Date().getFullYear()));
+  const [month, setMonth] = useState("");
+  const [year, setYear] = useState("");
+  useEffect(() => {
+    const now = new Date();
+    setMonth(now.toISOString().slice(0, 7));
+    setYear(String(now.getFullYear()));
+  }, []);
   const [editing, setEditing] = useState<Transaction | null>(null);
   const [deleting, setDeleting] = useState<Transaction | null>(null);
   const [editAmount, setEditAmount] = useState("");
@@ -93,7 +97,7 @@ export default function TransactionsPage() {
   const [accountError, setAccountError] = useState("");
   const [accountNotice, setAccountNotice] = useState("");
 
-  const queryOptions = { skip: status !== "authenticated" || !userId };
+  const queryOptions = { skip: status !== "authenticated" || !userId || (!month && dateFilter === "month") || (!year && dateFilter === "year") };
   const { data: categoriesData, error: categoriesError } = useQuery<CategoriesData>(GET_CATEGORIES, {
     variables: { userId },
     ...queryOptions,
@@ -108,8 +112,8 @@ export default function TransactionsPage() {
       search: search.trim() || undefined,
       categoryId: categoryId || undefined,
       type: type || undefined,
-      month: dateFilter === "month" ? month : undefined,
-      year: dateFilter === "year" ? Number(year) : undefined,
+      month: dateFilter === "month" && month ? month : undefined,
+      year: dateFilter === "year" && year ? Number(year) : undefined,
     },
     ...queryOptions,
   });

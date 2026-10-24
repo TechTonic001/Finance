@@ -62,7 +62,6 @@ type SpendingComparison = {
 type SpendingComparisonData = { getMonthlySpendingComparison: SpendingComparison };
 
 const chartColors = ["#16715a", "#e49a42", "#4b7b9c", "#b65e57", "#83944b", "#876da8"];
-const currentMonth = new Date().toISOString().slice(0, 7);
 function formatMonth(value: ReactNode) {
   if (typeof value !== "string") return "";
   const [year, month] = value.split("-").map(Number);
@@ -87,11 +86,15 @@ export default function DashboardPage() {
   const { data: session, status } = useSession();
   const [modalOpen, setModalOpen] = useState(false);
   const [recurringError, setRecurringError] = useState("");
+  const [currentMonth, setCurrentMonth] = useState("");
   const processedForUser = useRef<string | null>(null);
   const userId = session?.user?.id ?? "";
+  useEffect(() => {
+    setCurrentMonth(new Date().toISOString().slice(0, 7));
+  }, []);
   const queryOptions = {
     variables: { userId },
-    skip: status !== "authenticated" || !userId,
+    skip: status !== "authenticated" || !userId || !currentMonth,
   };
   const { data, loading, error } = useQuery<DashboardData>(GET_DASHBOARD_DATA, {
     ...queryOptions,
