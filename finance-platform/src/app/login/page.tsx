@@ -4,11 +4,13 @@ import { signIn } from "next-auth/react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
+import { Eye, EyeOff } from "lucide-react";
 
 export default function LoginPage() {
   const router = useRouter();
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -18,7 +20,7 @@ export default function LoginPage() {
     const formData = new FormData(event.currentTarget);
     try {
       const result = await signIn("credentials", {
-        email: formData.get("email"),
+        identifier: formData.get("identifier"),
         password: formData.get("password"),
         redirect: false,
       });
@@ -66,29 +68,41 @@ export default function LoginPage() {
           </Link>
           <p className="text-sm font-medium text-emerald-800">Welcome back</p>
           <h2 className="mt-2 text-3xl font-semibold tracking-tight text-zinc-950">Sign in to Ledger</h2>
-          <p className="mt-2 text-sm text-zinc-500">Use the email and password associated with your account.</p>
+          <p className="mt-2 text-sm text-zinc-500">Sign in with your email or username and password.</p>
 
           <form className="mt-8 space-y-5" onSubmit={handleSubmit}>
             <label className="block text-sm font-medium text-zinc-700">
-              Email
+              Email or username
               <input
-                autoComplete="email"
+                autoComplete="username"
                 className="mt-2 h-11 w-full border border-zinc-300 bg-white px-3 text-sm text-zinc-900 outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/15"
-                name="email"
+                maxLength={254}
+                name="identifier"
                 required
-                type="email"
+                type="text"
               />
             </label>
-            <label className="block text-sm font-medium text-zinc-700">
-              Password
-              <input
-                autoComplete="current-password"
-                className="mt-2 h-11 w-full border border-zinc-300 bg-white px-3 text-sm text-zinc-900 outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/15"
-                name="password"
-                required
-                type="password"
-              />
-            </label>
+            <div>
+              <label className="block text-sm font-medium text-zinc-700" htmlFor="password">Password</label>
+              <div className="mt-2 flex h-11 border border-zinc-300 bg-white focus-within:border-emerald-700 focus-within:ring-2 focus-within:ring-emerald-700/15">
+                <input
+                  autoComplete="current-password"
+                  className="min-w-0 flex-1 px-3 text-sm text-zinc-900 outline-none"
+                  id="password"
+                  name="password"
+                  required
+                  type={showPassword ? "text" : "password"}
+                />
+                <button
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                  className="grid w-11 shrink-0 place-items-center text-zinc-500 hover:text-zinc-900"
+                  onClick={() => setShowPassword((visible) => !visible)}
+                  type="button"
+                >
+                  {showPassword ? <EyeOff aria-hidden="true" size={18} /> : <Eye aria-hidden="true" size={18} />}
+                </button>
+              </div>
+            </div>
             {error && (
               <p aria-live="polite" className="text-sm text-red-700" role="alert">
                 {error}

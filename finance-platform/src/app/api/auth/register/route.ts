@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { ensureDefaultAccounts } from "@/lib/default-accounts";
 import { ensureDefaultCategories } from "@/lib/default-categories";
 import { prisma } from "@/lib/prisma";
-import { isValidEmail, isValidPassword } from "@/lib/auth-validation";
+import { isValidEmail, isValidPassword, isValidUsername } from "@/lib/auth-validation";
 
 const BCRYPT_MAX_BYTES = 72;
 
@@ -16,12 +16,19 @@ export async function POST(request: Request) {
   }
 
   if (!body || typeof body !== "object") {
-    return NextResponse.json({ error: "Email and password are required." }, { status: 400 });
+    return NextResponse.json({ error: "Username, email, and password are required." }, { status: 400 });
   }
 
-  const { email: rawEmail, password } = body as Record<string, unknown>;
+  const { email: rawEmail, username: rawUsername, password } = body as Record<string, unknown>;
   const email = typeof rawEmail === "string" ? rawEmail.trim().toLowerCase() : "";
+  const username = typeof rawUsername === "string" ? rawUsername.trim().toLowerCase() : "";
 
+  if (!isValidUsername(username)) {
+    return NextResponse.json(
+      { error: "Username must be 3–20 characters and use only letters, numbers, and underscores." },
+      { status: 400 },
+    );
+  }
   if (!isValidEmail(email)) {
     return NextResponse.json({ error: "Enter a valid email address." }, { status: 400 });
   }
@@ -35,20 +42,20 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Password must be 72 bytes or fewer." }, { status: 400 });
   }
 
-  const existingUser = await prisma.user.findUnique({
-    where: { email },
+  const existingUser = await prisma.user.findFirst({
+    where: { OR: [{ email }, { username }] },
     select: { id: true },
   });
   if (existingUser) {
-    return NextResponse.json({ error: "An account with this email already exists." }, { status: 409 });
+    return NextResponse.json({ error: "An account with this email or username already exists." }, { status: 409 });
   }
 
   try {
     const passwordHash = await hash(password, 12);
     const user = await prisma.$transaction(async (transaction) => {
       const createdUser = await transaction.user.create({
-        data: { email, password: passwordHash },
-        select: { id: true, email: true },
+        data: { email, username, password: passwordHash },
+        select: { id: true, email: true, username: true },
       });
       await ensureDefaultCategories(transaction, createdUser.id);
       await ensureDefaultAccounts(transaction, createdUser.id);
@@ -63,7 +70,7 @@ export async function POST(request: Request) {
       "code" in error &&
       error.code === "P2002"
     ) {
-      return NextResponse.json({ error: "An account with this email already exists." }, { status: 409 });
+      return NextResponse.json({ error: "An account with this email or username already exists." }, { status: 409 });
     }
     console.error("User registration failed.", error);
     return NextResponse.json({ error: "Unable to create your account right now." }, { status: 500 });

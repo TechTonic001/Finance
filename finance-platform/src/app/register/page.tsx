@@ -7,6 +7,7 @@ import { Eye, EyeOff } from "lucide-react";
 import {
   isValidEmail,
   isValidPassword,
+  isValidUsername,
   PASSWORD_REQUIREMENTS,
 } from "@/lib/auth-validation";
 
@@ -14,6 +15,7 @@ export default function RegisterPage() {
   const router = useRouter();
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -31,7 +33,8 @@ export default function RegisterPage() {
       : { label: password ? "Weak" : "Not set", width: password ? "w-1/3" : "w-0", color: "bg-rose-500", text: "text-rose-700" };
   const passwordMatches = password === confirmPassword;
   const passwordBytesValid = new TextEncoder().encode(password).length <= 72;
-  const canSubmit = isValidEmail(email.trim())
+  const canSubmit = isValidUsername(username.trim())
+    && isValidEmail(email.trim())
     && isValidPassword(password)
     && passwordMatches
     && passwordBytesValid
@@ -41,7 +44,12 @@ export default function RegisterPage() {
     event.preventDefault();
     setError("");
 
+    const normalizedUsername = username.trim().toLowerCase();
     const normalizedEmail = email.trim().toLowerCase();
+    if (!isValidUsername(normalizedUsername)) {
+      setError("Username must be 3–20 characters and use only letters, numbers, and underscores.");
+      return;
+    }
     if (!isValidEmail(normalizedEmail)) {
       setError("Enter a valid email address.");
       return;
@@ -64,7 +72,7 @@ export default function RegisterPage() {
       const response = await fetch("/api/auth/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: normalizedEmail, password }),
+        body: JSON.stringify({ username: normalizedUsername, email: normalizedEmail, password }),
       });
       const result = (await response.json()) as { error?: string };
 
@@ -103,6 +111,22 @@ export default function RegisterPage() {
           <p className="mt-2 text-sm text-zinc-500">A few details are all you need to get started.</p>
 
           <form className="mt-8 space-y-5" onSubmit={handleSubmit}>
+            <label className="block text-sm font-medium text-zinc-700">
+              Username
+              <input
+                autoComplete="username"
+                className="mt-2 h-11 w-full border border-zinc-300 bg-white px-3 text-sm text-zinc-900 outline-none focus:border-emerald-700 focus:ring-2 focus:ring-emerald-700/15"
+                maxLength={20}
+                name="username"
+                onChange={(event) => setUsername(event.target.value)}
+                required
+                type="text"
+                value={username}
+              />
+              {username && !isValidUsername(username.trim()) && (
+                <span className="mt-1 block text-xs font-normal text-rose-700">Use 3–20 letters, numbers, or underscores.</span>
+              )}
+            </label>
             <label className="block text-sm font-medium text-zinc-700">
               Email
               <input

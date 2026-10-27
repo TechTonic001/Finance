@@ -1,6 +1,8 @@
 export const EMAIL_REGEX =
   /^[a-z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+$/i;
 
+export const USERNAME_REGEX = /^[a-z0-9_]{3,20}$/i;
+
 export const PASSWORD_REGEX =
   /^(?=.*[A-Z])(?=.*[a-z])(?=.*\d)(?=.*[!@#$%^&*]).{8,}$/;
 
@@ -14,6 +16,10 @@ export const PASSWORD_REQUIREMENTS = [
 
 export function isValidEmail(value: string): boolean {
   return value.length <= 254 && EMAIL_REGEX.test(value);
+}
+
+export function isValidUsername(value: string): boolean {
+  return USERNAME_REGEX.test(value);
 }
 
 export function isValidPassword(value: string): boolean {
